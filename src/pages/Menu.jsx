@@ -79,7 +79,7 @@ export default function Menu() {
   const handleConfirmOrder = () => {
     if (cartItems.length === 0) return;
     // Aquí pasarías el carrito al siguiente paso
-    navigate("/order-confirm");
+    navigate("/confirm");
   };
 
   return (
