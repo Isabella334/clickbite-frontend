@@ -10,6 +10,19 @@ import { useNavigate } from "react-router-dom";
 // ─────────────────────────────────────────────
 const CATEGORIES = ["Burgers", "Sides", "Drinks", "Desserts"];
 
+// ── Pipeline 2: Platillos más vendidos
+// GET /api/restaurant/analytics/bestsellers
+// db.orders.aggregate([ {$unwind:"$items"},
+//   {$group:{_id:"$items.menu_item_id", name:{$first:"$items.name"}, totalSold:{$sum:"$items.qty"}}},
+//   {$sort:{totalSold:-1}} ])
+const mockBestsellers = [
+  { id: 1, name: "Classic Smash",   image: "🍔", totalSold: 284, category: "Burgers"  },
+  { id: 5, name: "Crispy Fries",    image: "🍟", totalSold: 251, category: "Sides"    },
+  { id: 7, name: "Chocolate Shake", image: "🥤", totalSold: 198, category: "Drinks"   },
+  { id: 2, name: "BBQ Bacon Stack", image: "🥩", totalSold: 163, category: "Burgers"  },
+  { id: 9, name: "Brownie Sundae",  image: "🍫", totalSold: 112, category: "Desserts" },
+];
+
 const initialItems = [
   { id: 1, category: "Burgers",  name: "Classic Smash",    description: "Double smash patty, cheddar, pickles, house sauce",     price: 10.99, available: true,  popular: true,  image: "🍔" },
   { id: 2, category: "Burgers",  name: "BBQ Bacon Stack",  description: "Triple patty, crispy bacon, BBQ sauce, onion rings",    price: 14.99, available: true,  popular: true,  image: "🥩" },
@@ -599,7 +612,21 @@ export default function RestaurantDashboard() {
 
         .rd-toast-icon { font-size: 1rem; }
 
-        /* ── RESPONSIVE ── */
+        /* ── BESTSELLERS PIPELINE ── */
+        .rd-bestsellers { background: #111820; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 18px 20px; margin-bottom: 20px; animation: fadeUp 0.3s ease; }
+        .rd-bs-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .rd-bs-title { font-family: 'Syne', sans-serif; font-size: 0.92rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+        .rd-bs-pipeline { font-size: 0.7rem; color: rgba(255,255,255,0.22); }
+        .rd-bs-list { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+        .rd-bs-item { flex-shrink: 0; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 14px 16px; min-width: 130px; text-align: center; }
+        .rd-bs-emoji { font-size: 1.5rem; margin-bottom: 8px; }
+        .rd-bs-name { font-size: 0.8rem; font-weight: 500; color: #fff; margin-bottom: 4px; }
+        .rd-bs-cat  { font-size: 0.68rem; color: rgba(255,255,255,0.25); margin-bottom: 8px; }
+        .rd-bs-sold { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 800; color: #52c49b; }
+        .rd-bs-sold-label { font-size: 0.68rem; color: rgba(255,255,255,0.2); margin-top: 1px; }
+        .rd-bs-rank-1 { border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.05); }
+        .rd-bs-rank-2 { border-color: rgba(148,163,184,0.25); }
+        .rd-bs-rank-3 { border-color: rgba(205,127,50,0.2); }
         @media (max-width: 900px) {
           .rd-item-desc { display: none; }
         }
@@ -672,6 +699,25 @@ export default function RestaurantDashboard() {
 
           {/* CONTENT */}
           <div className="rd-content">
+
+            {/* ── Pipeline 2: Platillos más vendidos ── */}
+            <div className="rd-bestsellers">
+              <div className="rd-bs-header">
+                <div className="rd-bs-title">🔥 Best-selling items</div>
+                <span className="rd-bs-pipeline">$unwind → $group → $sum → $sort</span>
+              </div>
+              <div className="rd-bs-list">
+                {mockBestsellers.map((item, i) => (
+                  <div key={item.id} className={"rd-bs-item" + (i === 0 ? " rd-bs-rank-1" : i === 1 ? " rd-bs-rank-2" : i === 2 ? " rd-bs-rank-3" : "")}>
+                    <div className="rd-bs-emoji">{item.image}</div>
+                    <div className="rd-bs-name">{item.name}</div>
+                    <div className="rd-bs-cat">{item.category}</div>
+                    <div className="rd-bs-sold">{item.totalSold}</div>
+                    <div className="rd-bs-sold-label">units sold</div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             {/* CATEGORY FILTERS */}
             <div className="rd-filters">

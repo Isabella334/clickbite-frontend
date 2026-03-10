@@ -28,13 +28,16 @@ const initialRestaurants = [
   { id: 4, name: "Taco Fiesta",   owner: "Rosa M.",  category: "Mexican", orders: 178, rating: 4.5, status: "active",   joined: "Oct 14, 2023", image: "🌮", email: "tacos@restaurant.com",phone: "555-0104", menuItems: 14 },
 ];
 
+// ── Pipeline 4: Historial resumido por usuario
+// GET /api/admin/analytics/user-order-summary
+// db.orders.aggregate([ {$group:{_id:"$user_id", totalOrders:{$sum:1}, totalSpent:{$sum:"$total"}}} ])
 const initialUsers = [
-  { id: 1, name: "María García",     email: "maria@email.com",      role: "customer",   status: "active",    joined: "Jan 12, 2024", orders: 18 },
-  { id: 2, name: "Carlos Rodríguez", email: "carlos@email.com",     role: "customer",   status: "active",    joined: "Feb 3, 2024",  orders: 7  },
-  { id: 3, name: "Ana López",        email: "ana@email.com",        role: "customer",   status: "suspended", joined: "Mar 1, 2024",  orders: 2  },
-  { id: 4, name: "Burger Palace",    email: "bp@restaurant.com",    role: "restaurant", status: "active",    joined: "Dec 5, 2023",  orders: 320},
-  { id: 5, name: "Sushi Zen",        email: "zen@restaurant.com",   role: "restaurant", status: "active",    joined: "Nov 20, 2023", orders: 210},
-  { id: 6, name: "Luis Méndez",      email: "luis@email.com",       role: "customer",   status: "active",    joined: "Feb 18, 2024", orders: 5  },
+  { id: 1, name: "María García",     email: "maria@email.com",      role: "customer",   status: "active",    joined: "Jan 12, 2024", orders: 18, totalSpent: 284.50 },
+  { id: 2, name: "Carlos Rodríguez", email: "carlos@email.com",     role: "customer",   status: "active",    joined: "Feb 3, 2024",  orders: 7,  totalSpent: 98.75  },
+  { id: 3, name: "Ana López",        email: "ana@email.com",        role: "customer",   status: "suspended", joined: "Mar 1, 2024",  orders: 2,  totalSpent: 31.98  },
+  { id: 4, name: "Burger Palace",    email: "bp@restaurant.com",    role: "restaurant", status: "active",    joined: "Dec 5, 2023",  orders: 320,totalSpent: null   },
+  { id: 5, name: "Sushi Zen",        email: "zen@restaurant.com",   role: "restaurant", status: "active",    joined: "Nov 20, 2023", orders: 210,totalSpent: null   },
+  { id: 6, name: "Luis Méndez",      email: "luis@email.com",       role: "customer",   status: "active",    joined: "Feb 18, 2024", orders: 5,  totalSpent: 67.45  },
 ];
 
 const mockOrders = [
@@ -44,6 +47,33 @@ const mockOrders = [
   { id: "ORD-0039", customer: "Luis M.",    restaurant: "Taco Fiesta",   total: 12.98, status: "delivered",  date: "Today, 2:42 PM" },
   { id: "ORD-0038", customer: "Sofía P.",   restaurant: "Burger Palace", total: 30.96, status: "delivered",  date: "Today, 2:29 PM" },
   { id: "ORD-0037", customer: "Diego F.",   restaurant: "Sushi Zen",     total: 44.97, status: "cancelled",  date: "Today, 2:15 PM" },
+];
+
+// ── Pipeline 1: Restaurantes mejor calificados
+// GET /api/admin/analytics/top-rated-restaurants
+// db.reviews.aggregate([ {$group:{_id:"$restaurant_id", avgRating:{$avg:"$rating"}, totalReviews:{$sum:1}}},
+//   {$lookup:{from:"restaurants",localField:"_id",foreignField:"_id",as:"restaurant"}},
+//   {$sort:{avgRating:-1}}, {$limit:5} ])
+const mockTopRated = [
+  { id: 2, name: "Sushi Zen",    image: "🍣", avgRating: 4.9, totalReviews: 184 },
+  { id: 1, name: "Burger Palace",image: "🍔", avgRating: 4.8, totalReviews: 320 },
+  { id: 6, name: "Noodle House", image: "🍜", avgRating: 4.7, totalReviews: 97  },
+  { id: 4, name: "Taco Fiesta",  image: "🌮", avgRating: 4.5, totalReviews: 142 },
+  { id: 5, name: "Green Bowl",   image: "🥗", avgRating: 4.4, totalReviews: 73  },
+];
+
+// ── Pipeline 3: Total de ventas por restaurante (solo órdenes delivered)
+// GET /api/admin/analytics/revenue-by-restaurant
+// db.orders.aggregate([ {$match:{status:"delivered"}},
+//   {$group:{_id:"$restaurant_id", totalRevenue:{$sum:"$total"}, totalOrders:{$sum:1}}},
+//   {$sort:{totalRevenue:-1}} ])
+const mockRevenueByRestaurant = [
+  { id: 1, name: "Burger Palace", image: "🍔", totalRevenue: 4820.50, totalOrders: 320 },
+  { id: 2, name: "Sushi Zen",     image: "🍣", totalRevenue: 3940.20, totalOrders: 210 },
+  { id: 4, name: "Taco Fiesta",   image: "🌮", totalRevenue: 2615.80, totalOrders: 178 },
+  { id: 6, name: "Noodle House",  image: "🍜", totalRevenue: 1988.40, totalOrders: 143 },
+  { id: 5, name: "Green Bowl",    image: "🥗", totalRevenue: 1240.10, totalOrders: 95  },
+  { id: 3, name: "Pizza Mondo",   image: "🍕", totalRevenue:  980.75, totalOrders: 89  },
 ];
 
 const CATEGORIES   = ["Burgers", "Pizza", "Sushi", "Mexican", "Asian", "Healthy", "Chicken", "Italian", "Indian"];
@@ -78,6 +108,8 @@ export default function AdminDashboard() {
   const [userFilter,     setUserFilter]     = useState("All");
   const [orderFilter,    setOrderFilter]    = useState("All");
   const [chartMetric,    setChartMetric]    = useState("revenue");
+  const [topRatedLimit,  setTopRatedLimit]  = useState(5);
+  const [revenueLimit,   setRevenueLimit]   = useState(6);
   const [toast,          setToast]          = useState("");
 
   // ── Restaurant wizard ──
@@ -503,8 +535,28 @@ export default function AdminDashboard() {
         .ad-toast { position: fixed; bottom: 24px; right: 24px; display: flex; align-items: center; gap: 10px; padding: 13px 18px; background: #1a2535; border: 1px solid rgba(82,196,155,0.3); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); z-index: 500; font-size: 0.88rem; color: #fff; animation: toastIn 0.35s cubic-bezier(0.34,1.56,0.64,1); }
         @keyframes toastIn { from { opacity: 0; transform: translateY(10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
-        /* ── RESPONSIVE ── */
-        @media (max-width: 1100px) { .ad-stats { grid-template-columns: repeat(2, 1fr); } .ad-grid { grid-template-columns: 1fr; } }
+        /* ── PIPELINE CARDS ── */
+        .ad-pipeline-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+
+        .ad-rank-row { display: flex; align-items: center; gap: 10px; padding: 11px 20px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .ad-rank-row:last-child { border-bottom: none; }
+        .ad-rank-num { font-family: 'Syne', sans-serif; font-size: 0.78rem; font-weight: 800; color: rgba(255,255,255,0.15); min-width: 20px; text-align: center; }
+        .ad-rank-num.top { color: #fbbf24; }
+        .ad-rank-emoji { font-size: 1.1rem; }
+        .ad-rank-name { flex: 1; font-size: 0.86rem; font-weight: 500; color: #fff; }
+        .ad-rank-meta { font-size: 0.74rem; color: rgba(255,255,255,0.28); }
+
+        .ad-stars { color: #fbbf24; font-size: 0.75rem; letter-spacing: 1px; }
+
+        .ad-rev-bar-wrap { flex: 1; }
+        .ad-rev-bar-track { height: 5px; background: rgba(255,255,255,0.06); border-radius: 999px; overflow: hidden; margin-top: 4px; }
+        .ad-rev-bar-fill  { height: 100%; background: linear-gradient(90deg, #52c49b, #63d4ab); border-radius: 999px; transition: width 0.5s ease; }
+        .ad-rev-amount { font-family: 'Syne', sans-serif; font-size: 0.88rem; font-weight: 700; color: #52c49b; white-space: nowrap; }
+
+        .ad-limit-select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 7px; color: rgba(255,255,255,0.5); font-family: 'DM Sans', sans-serif; font-size: 0.76rem; padding: 4px 8px; outline: none; cursor: pointer; transition: all 0.18s; }
+        .ad-limit-select:focus, .ad-limit-select:hover { border-color: #52c49b; color: #fff; }
+        .ad-limit-select option { background: #1a2535; }
+        @media (max-width: 1100px) { .ad-pipeline-grid { grid-template-columns: 1fr; } }
         @media (max-width: 720px) { .ad-sidebar { display: none; } .ad-content { padding: 20px; } .ad-topbar { padding: 14px 20px; } .ad-stats { grid-template-columns: repeat(2, 1fr); } }
       `}</style>
 
@@ -621,6 +673,70 @@ export default function AdminDashboard() {
                     })}
                   </div>
                 </div>
+
+                {/* ── Pipeline 1: Restaurantes mejor calificados ── */}
+                {/* ── Pipeline 3: Total de ventas por restaurante ── */}
+                <div className="ad-pipeline-grid">
+                  <div className="ad-card" style={{ animationDelay: "0.2s" }}>
+                    <div className="ad-card-header">
+                      <div className="ad-card-title">⭐ Top-rated restaurants</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.25)" }}>$limit</span>
+                        <select className="ad-limit-select" value={topRatedLimit} onChange={e => setTopRatedLimit(Number(e.target.value))}>
+                          {[3, 5, 10, mockTopRated.length].map(n => <option key={n} value={n}>{n === mockTopRated.length ? "All" : "Top " + n}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    {mockTopRated.slice(0, topRatedLimit).map((r, i) => (
+                      <div key={r.id} className="ad-rank-row">
+                        <span className={"ad-rank-num" + (i < 3 ? " top" : "")}>#{i + 1}</span>
+                        <span className="ad-rank-emoji">{r.image}</span>
+                        <div style={{ flex: 1 }}>
+                          <div className="ad-rank-name">{r.name}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                            <span className="ad-stars">{"★".repeat(Math.round(r.avgRating))}{"☆".repeat(5 - Math.round(r.avgRating))}</span>
+                            <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.3)" }}>{r.avgRating.toFixed(1)}</span>
+                          </div>
+                        </div>
+                        <span className="ad-rank-meta">{r.totalReviews} reviews</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="ad-card" style={{ animationDelay: "0.25s" }}>
+                    <div className="ad-card-header">
+                      <div className="ad-card-title">💰 Revenue by restaurant</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.25)" }}>$limit</span>
+                        <select className="ad-limit-select" value={revenueLimit} onChange={e => setRevenueLimit(Number(e.target.value))}>
+                          {[3, 5, mockRevenueByRestaurant.length].map(n => <option key={n} value={n}>{n === mockRevenueByRestaurant.length ? "All" : "Top " + n}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ padding: "12px 20px" }}>
+                      {mockRevenueByRestaurant.slice(0, revenueLimit).map((r) => {
+                        const maxRev = mockRevenueByRestaurant[0].totalRevenue;
+                        const pct    = Math.round((r.totalRevenue / maxRev) * 100);
+                        return (
+                          <div key={r.id} style={{ marginBottom: 13 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                              <span style={{ fontSize: "1rem" }}>{r.image}</span>
+                              <span style={{ flex: 1, fontSize: "0.83rem", fontWeight: 500, color: "#fff" }}>{r.name}</span>
+                              <span className="ad-rev-amount">${r.totalRevenue.toLocaleString()}</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div className="ad-rev-bar-track" style={{ flex: 1 }}>
+                                <div className="ad-rev-bar-fill" style={{ width: pct + "%" }} />
+                              </div>
+                              <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.25)", minWidth: 58 }}>{r.totalOrders} orders</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
               </>
             )}
 
@@ -692,7 +808,7 @@ export default function AdminDashboard() {
                 <div className="ad-table-wrap">
                   <table className="ad-table">
                     <thead>
-                      <tr><th>User</th><th>Role</th><th>Joined</th><th>Orders</th><th>Status</th><th>Action</th></tr>
+                      <tr><th>User</th><th>Role</th><th>Joined</th><th>Orders</th><th>Total spent</th><th>Status</th><th>Action</th></tr>
                     </thead>
                     <tbody>
                       {filteredUsers.map(u => (
@@ -709,6 +825,9 @@ export default function AdminDashboard() {
                           <td><span className={"ad-role-pill ad-role-" + u.role}>{u.role}</span></td>
                           <td style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.8rem" }}>{u.joined}</td>
                           <td style={{ fontWeight: 600, color: "#fff" }}>{u.orders}</td>
+                          <td style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, color: u.totalSpent ? "#52c49b" : "rgba(255,255,255,0.2)", fontSize: "0.88rem" }}>
+                            {u.totalSpent != null ? "$" + u.totalSpent.toFixed(2) : "—"}
+                          </td>
                           <td><span className={"ad-status " + u.status}>{u.status}</span></td>
                           <td>
                             <button className={"ad-btn-sm " + (u.status === "active" ? "ad-btn-toggle-on" : "ad-btn-toggle-off")} onClick={() => toggleUserStatus(u.id)}>
