@@ -71,6 +71,11 @@ export const menuItems = {
   createBatch:     (restaurantId, items) => post("/menu-items/batch/" + restaurantId, items),
   update:          (id, data)     => put("/menu-items/" + id, data),
   delete:          (id)           => del("/menu-items/" + id),
+  // PATCH /menu-items/bulk - UpdateMany (funciona con 1 o varios IDs)
+  // fields permitidos: { is_available, category, price, stock }
+  bulkUpdate:      (ids, fields)  => patch("/menu-items/bulk", { ids, fields }),
+  // DELETE /menu-items/bulk - DeleteMany (funciona con 1 o varios IDs)
+  bulkDelete:      (ids)          => request("DELETE", "/menu-items/bulk", { ids }),
 };
 
 
