@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 export default function Login() {
   const navigate = useNavigate();
   const [mode, setMode] = useState("login");
-  const [role, setRole] = useState("customer");
+  const role = "customer"; // Register is always customer — restaurants are created by admin
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -60,10 +60,7 @@ export default function Login() {
     if (errors[field]) setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
   };
 
-  const registerRoles = [
-    { key: "customer", label: "Customer", icon: "🛍️", desc: "Order food from restaurants" },
-    { key: "restaurant", label: "Restaurant", icon: "🍽️", desc: "Manage your restaurant" },
-  ];
+  // Restaurants are created by admin — only customers can self-register
 
   return (
     <>
@@ -88,7 +85,6 @@ export default function Login() {
           justify-content: center;
           padding: 60px;
           position: relative;
-          background: linear-gradient(145deg, #1a2e2a 0%, #0d1f1c 60%, #071412 100%);
           overflow: hidden;
         }
 
@@ -97,7 +93,6 @@ export default function Login() {
           position: absolute;
           width: 500px; height: 500px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(82,196,155,0.18) 0%, transparent 70%);
           top: -100px; left: -100px;
           pointer-events: none;
         }
@@ -107,7 +102,6 @@ export default function Login() {
           position: absolute;
           width: 350px; height: 350px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(82,196,155,0.1) 0%, transparent 70%);
           bottom: -50px; right: 40px;
           pointer-events: none;
         }
@@ -212,14 +206,6 @@ export default function Login() {
           overflow-y: auto;
         }
 
-        .cb-right::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 0;
-          width: 1px; height: 100%;
-          background: linear-gradient(to bottom, transparent, rgba(82,196,155,0.3) 30%, rgba(82,196,155,0.3) 70%, transparent);
-        }
-
         /* MODE TOGGLE */
         .cb-mode-toggle {
           display: flex;
@@ -269,60 +255,13 @@ export default function Login() {
         }
 
         /* ROLE CARDS — solo registro */
-        .cb-role-label {
+        /* role styles removed — customers only */
           font-size: 0.78rem;
           font-weight: 500;
           color: rgba(255,255,255,0.4);
           text-transform: uppercase;
           letter-spacing: 0.08em;
           margin-bottom: 10px;
-        }
-
-        .cb-role-cards {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-          margin-bottom: 24px;
-        }
-
-        .cb-role-card {
-          padding: 14px;
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 10px;
-          background: transparent;
-          font-family: 'DM Sans', sans-serif;
-          cursor: pointer;
-          transition: all 0.2s;
-          text-align: left;
-        }
-
-        .cb-role-card:hover {
-          border-color: rgba(82,196,155,0.4);
-        }
-
-        .cb-role-card.active {
-          border-color: #52c49b;
-          background: rgba(82,196,155,0.08);
-        }
-
-        .cb-role-card-icon { font-size: 1.4rem; margin-bottom: 6px; display: block; }
-
-        .cb-role-card-title {
-          display: block;
-          font-size: 0.9rem;
-          font-weight: 600;
-          color: #fff;
-          margin-bottom: 2px;
-        }
-
-        .cb-role-card.active .cb-role-card-title { color: #52c49b; }
-
-        .cb-role-card-desc {
-          display: block;
-          font-size: 0.75rem;
-          color: rgba(255,255,255,0.3);
-          line-height: 1.3;
-          font-weight: 300;
         }
 
         /* FIELDS */
@@ -436,18 +375,14 @@ export default function Login() {
         <div className="cb-left">
           <div className="cb-brand">
             <div className="cb-brand-logo">Click<span>Bite</span></div>
-            <div className="cb-brand-tagline">Food delivery, reimagined</div>
           </div>
 
           <div className="cb-hero-text">
             <h2>
-              Your favorite<br />
-              food, <em>delivered</em><br />
-              instantly.
+              Tu comida<br />
+              favorita, <em>entregada</em><br />
+              al instante.
             </h2>
-            <p>
-              Discover hundreds of restaurants near you and get fresh meals delivered right to your door.
-            </p>
           </div>
         </div>
 
@@ -458,52 +393,27 @@ export default function Login() {
               className={"cb-mode-btn" + (mode === "login" ? " active" : "")}
               onClick={() => { setMode("login"); setErrors({}); }}
             >
-              Sign In
+              Iniciar sesión
             </button>
             <button
               className={"cb-mode-btn" + (mode === "register" ? " active" : "")}
               onClick={() => { setMode("register"); setErrors({}); }}
             >
-              Create Account
+              Crear cuenta
             </button>
           </div>
 
           <div className="cb-form-area" key={mode}>
             <div className="cb-form-heading">
-              <h1>{mode === "login" ? "Welcome back" : "Join ClickBite"}</h1>
-              <p>
-                {mode === "login"
-                  ? "Enter your credentials to continue"
-                  : "Create your account to get started"}
-              </p>
+              <h1>{mode === "login" ? "¡Has vuelto!" : "Únete a ClickBite"}</h1>
             </div>
-
-            {/* ROLE CARDS — solo en registro, sin Admin */}
-            {mode === "register" && (
-              <>
-                <div className="cb-role-label">I want to</div>
-                <div className="cb-role-cards">
-                  {registerRoles.map(r => (
-                    <button
-                      key={r.key}
-                      className={"cb-role-card" + (role === r.key ? " active" : "")}
-                      onClick={() => setRole(r.key)}
-                    >
-                      <span className="cb-role-card-icon">{r.icon}</span>
-                      <span className="cb-role-card-title">{r.label}</span>
-                      <span className="cb-role-card-desc">{r.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
 
             {mode === "register" && (
               <div className="cb-field">
-                <label>Full Name</label>
+                <label>Nombre completo</label>
                 <input
                   type="text"
-                  placeholder="Jane Smith"
+                  placeholder="Luis Pérez"
                   className={errors.name ? "error" : ""}
                   value={form.name}
                   onChange={e => handleChange("name", e.target.value)}
@@ -513,10 +423,10 @@ export default function Login() {
             )}
 
             <div className="cb-field">
-              <label>Email</label>
+              <label>Correo electrónico</label>
               <input
                 type="email"
-                placeholder="you@example.com"
+                placeholder="nombre@ejemplo.com"
                 className={errors.email ? "error" : ""}
                 value={form.email}
                 onChange={e => handleChange("email", e.target.value)}
@@ -525,7 +435,7 @@ export default function Login() {
             </div>
 
             <div className="cb-field">
-              <label>Password</label>
+              <label>Contraseña</label>
               <input
                 type="password"
                 placeholder="••••••••"
@@ -538,7 +448,7 @@ export default function Login() {
 
             {mode === "register" && (
               <div className="cb-field">
-                <label>Confirm Password</label>
+                <label>Confirmar contraseña</label>
                 <input
                   type="password"
                   placeholder="••••••••"
@@ -554,20 +464,8 @@ export default function Login() {
 
             <button className="cb-submit" onClick={handleSubmit} disabled={loading}>
               {loading && <span className="cb-spinner" />}
-              {loading ? "Please wait…" : mode === "login" ? "Sign In" : "Create Account"}
+              {loading ? "Please wait…" : mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
             </button>
-
-            <div className="cb-demo-hint">
-              {mode === "login" ? (
-                <>
-                  <strong>Demo:</strong> email con "admin" → Admin, "restaurant" → Restaurant, cualquier otro → Cliente.
-                </>
-              ) : (
-                <>
-                  <strong>Demo:</strong> el rol seleccionado se enviaría a la BD al registrarse.
-                </>
-              )}
-            </div>
           </div>
         </div>
       </div>
