@@ -44,7 +44,7 @@ export default function RestaurantDashboard() {
   const navigate = useNavigate();
 
   const [items,       setItems]       = useState(initialItems);
-  const [filterCat,   setFilterCat]   = useState("All");
+  const [filterCat,   setFilterCat]   = useState("Todos");
   const [search,      setSearch]      = useState("");
   const [modalOpen,   setModalOpen]   = useState(false);
   const [editingItem, setEditingItem] = useState(null); // null = new item
@@ -56,7 +56,7 @@ export default function RestaurantDashboard() {
 
   // ── Filtered items ──
   const filtered = items.filter(i => {
-    const matchCat    = filterCat === "All" || i.category === filterCat;
+    const matchCat    = filterCat === "Todos" || filterCat === "🔥 Popular" ? (filterCat === "🔥 Popular" ? i.popular : true) : i.category === filterCat;
     const matchSearch = search === "" || i.name.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
@@ -81,10 +81,10 @@ export default function RestaurantDashboard() {
   // ── Form validation ──
   const validate = () => {
     const e = {};
-    if (!form.name.trim())        e.name        = "Name is required";
-    if (!form.description.trim()) e.description = "Description is required";
+    if (!form.name.trim())        e.name        = "El nombre es obligatorio";
+    if (!form.description.trim()) e.description = "La descripción es obligatoria";
     if (!form.price || isNaN(parseFloat(form.price)) || parseFloat(form.price) <= 0)
-      e.price = "Enter a valid price";
+      e.price = "Ingresa un precio válido";
     return e;
   };
 
@@ -100,12 +100,12 @@ export default function RestaurantDashboard() {
         setItems(prev => prev.map(i =>
           i.id === editingItem.id ? { ...i, ...form, price: parseFloat(form.price) } : i
         ));
-        showToast("Item updated successfully");
+        showToast("Producto actualizado");
       } else {
         // POST /api/restaurant/menu-items
         const newItem = { ...form, id: Date.now(), price: parseFloat(form.price) };
         setItems(prev => [...prev, newItem]);
-        showToast("Item added to menu");
+        showToast("Producto agregado al menú");
       }
       setSaving(false);
       closeModal();
@@ -119,7 +119,7 @@ export default function RestaurantDashboard() {
     // DELETE /api/restaurant/menu-items/:deleteId
     setItems(prev => prev.filter(i => i.id !== deleteId));
     setDeleteId(null);
-    showToast("Item removed from menu");
+    showToast("Producto eliminado del menú");
   };
 
   // ── Toggle availability ──
@@ -659,15 +659,15 @@ export default function RestaurantDashboard() {
           <div className="rd-nav-section">Menu</div>
 
           <button className="rd-nav-item active">
-            <span>🍽️</span> My Menu
+            <span>🍽️</span> Mi Menú
           </button>
           <button className="rd-nav-item" onClick={() => navigate("/restaurant-orders")}>
-            <span>📋</span> Orders
+            <span>📋</span> Pedidos
             {pendingCount > 0 && <span className="rd-nav-badge">{pendingCount}</span>}
           </button>
 
           <div className="rd-sidebar-bottom">
-            <button className="rd-logout" onClick={() => navigate("/")}>← Log out</button>
+            <button className="rd-logout" onClick={() => navigate("/")}>← Cerrar sesión</button>
           </div>
         </aside>
 
@@ -677,8 +677,8 @@ export default function RestaurantDashboard() {
           {/* TOPBAR */}
           <div className="rd-topbar">
             <div>
-              <div className="rd-topbar-title">Menu management</div>
-              <div className="rd-topbar-sub">{items.length} items · {items.filter(i => !i.available).length} unavailable</div>
+              <div className="rd-topbar-title">Gestión del menú</div>
+              <div className="rd-topbar-sub">{items.length} items · {items.filter(i => !i.available).length} no disponible</div>
             </div>
             <div className="rd-topbar-right">
               <div className="rd-search-wrap">
@@ -686,13 +686,13 @@ export default function RestaurantDashboard() {
                 <input
                   className="rd-search"
                   type="text"
-                  placeholder="Search items…"
+                  placeholder="Buscar productos…"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                 />
               </div>
               <button className="rd-add-btn" onClick={openCreate}>
-                + Add item
+                + Agregar producto
               </button>
             </div>
           </div>
@@ -700,28 +700,9 @@ export default function RestaurantDashboard() {
           {/* CONTENT */}
           <div className="rd-content">
 
-            {/* ── Pipeline 2: Platillos más vendidos ── */}
-            <div className="rd-bestsellers">
-              <div className="rd-bs-header">
-                <div className="rd-bs-title">🔥 Best-selling items</div>
-                <span className="rd-bs-pipeline">$unwind → $group → $sum → $sort</span>
-              </div>
-              <div className="rd-bs-list">
-                {mockBestsellers.map((item, i) => (
-                  <div key={item.id} className={"rd-bs-item" + (i === 0 ? " rd-bs-rank-1" : i === 1 ? " rd-bs-rank-2" : i === 2 ? " rd-bs-rank-3" : "")}>
-                    <div className="rd-bs-emoji">{item.image}</div>
-                    <div className="rd-bs-name">{item.name}</div>
-                    <div className="rd-bs-cat">{item.category}</div>
-                    <div className="rd-bs-sold">{item.totalSold}</div>
-                    <div className="rd-bs-sold-label">units sold</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {/* CATEGORY FILTERS */}
             <div className="rd-filters">
-              {["All", ...CATEGORIES].map(c => (
+              {["Todos", "🔥 Popular", ...CATEGORIES].map(c => (
                 <button
                   key={c}
                   className={"rd-filter" + (filterCat === c ? " active" : "")}
@@ -734,7 +715,7 @@ export default function RestaurantDashboard() {
 
             <div className="rd-count">
               <strong>{filtered.length}</strong> item{filtered.length !== 1 ? "s" : ""}
-              {filterCat !== "All" && <> in <strong>{filterCat}</strong></>}
+              {filterCat !== "Todos" && <> in <strong>{filterCat}</strong></>}
             </div>
 
             {/* TABLE */}
@@ -742,18 +723,18 @@ export default function RestaurantDashboard() {
               {filtered.length === 0 ? (
                 <div className="rd-empty">
                   <div className="rd-empty-icon">🍽️</div>
-                  <p>No items found.</p>
+                  <p>No se encontraron productos.</p>
                 </div>
               ) : (
                 <table className="rd-table">
                   <thead>
                     <tr>
-                      <th>Item</th>
-                      <th>Category</th>
-                      <th>Price</th>
+                      <th>Producto</th>
+                      <th>Categoría</th>
+                      <th>Precio</th>
                       <th>Popular</th>
-                      <th>Available</th>
-                      <th>Actions</th>
+                      <th>Disponible</th>
+                      <th>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -782,14 +763,14 @@ export default function RestaurantDashboard() {
                               <div className="rd-switch-knob" />
                             </div>
                             <span className={"rd-avail-label " + (item.available ? "on" : "off")}>
-                              {item.available ? "Available" : "Unavailable"}
+                              {item.available ? "Disponible" : "No disponible"}
                             </span>
                           </button>
                         </td>
                         <td>
                           <div className="rd-actions">
-                            <button className="rd-btn-edit" onClick={() => openEdit(item)}>✏️ Edit</button>
-                            <button className="rd-btn-del"  onClick={() => confirmDelete(item.id)}>🗑 Delete</button>
+                            <button className="rd-btn-edit" onClick={() => openEdit(item)}>✏️ Editar</button>
+                            <button className="rd-btn-del"  onClick={() => confirmDelete(item.id)}>🗑 Eliminar</button>
                           </div>
                         </td>
                       </tr>
@@ -807,7 +788,7 @@ export default function RestaurantDashboard() {
             <div className="rd-modal" onClick={e => e.stopPropagation()}>
               <div className="rd-modal-header">
                 <div className="rd-modal-title">
-                  {editingItem ? "Edit item" : "Add new item"}
+                  {editingItem ? "Editar producto" : "Agregar producto"}
                 </div>
                 <button className="rd-modal-close" onClick={closeModal}>✕</button>
               </div>
@@ -816,7 +797,7 @@ export default function RestaurantDashboard() {
 
                 {/* EMOJI */}
                 <div className="rd-field">
-                  <label>Icon</label>
+                  <label>Icono</label>
                   <div className="rd-emoji-grid">
                     {EMOJI_OPTIONS.map(e => (
                       <button
@@ -832,10 +813,10 @@ export default function RestaurantDashboard() {
 
                 {/* NAME */}
                 <div className="rd-field">
-                  <label>Name</label>
+                  <label>Nombre</label>
                   <input
                     type="text"
-                    placeholder="e.g. Classic Smash Burger"
+                    placeholder="Ej. Hamburguesa Clásica"
                     className={formErrors.name ? "err" : ""}
                     value={form.name}
                     onChange={e => handleFormChange("name", e.target.value)}
@@ -845,10 +826,10 @@ export default function RestaurantDashboard() {
 
                 {/* DESCRIPTION */}
                 <div className="rd-field">
-                  <label>Description</label>
+                  <label>Descripción</label>
                   <textarea
                     rows={2}
-                    placeholder="Ingredients, preparation style…"
+                    placeholder="Ingredientes, estilo de preparación…"
                     className={formErrors.description ? "err" : ""}
                     value={form.description}
                     onChange={e => handleFormChange("description", e.target.value)}
@@ -859,7 +840,7 @@ export default function RestaurantDashboard() {
                 {/* PRICE + CATEGORY */}
                 <div className="rd-field-row">
                   <div className="rd-field">
-                    <label>Price ($)</label>
+                    <label>Precio ($)</label>
                     <input
                       type="number"
                       min="0"
@@ -872,7 +853,7 @@ export default function RestaurantDashboard() {
                     {formErrors.price && <span className="rd-field-error">{formErrors.price}</span>}
                   </div>
                   <div className="rd-field">
-                    <label>Category</label>
+                    <label>Categoría</label>
                     <select value={form.category} onChange={e => handleFormChange("category", e.target.value)}>
                       {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
@@ -881,7 +862,7 @@ export default function RestaurantDashboard() {
 
                 {/* CHECKBOXES */}
                 <div className="rd-field">
-                  <label>Options</label>
+                  <label>Opciones</label>
                   <div className="rd-checkboxes">
                     <label className={"rd-checkbox" + (form.available ? " checked" : "")}>
                       <input type="checkbox" checked={form.available} onChange={e => handleFormChange("available", e.target.checked)} />
@@ -891,7 +872,7 @@ export default function RestaurantDashboard() {
                     <label className={"rd-checkbox" + (form.popular ? " checked" : "")}>
                       <input type="checkbox" checked={form.popular} onChange={e => handleFormChange("popular", e.target.checked)} />
                       <div className="rd-checkbox-box">{form.popular && "✓"}</div>
-                      Mark as popular
+                      Marcar como popular
                     </label>
                   </div>
                 </div>
@@ -899,10 +880,10 @@ export default function RestaurantDashboard() {
               </div>
 
               <div className="rd-modal-footer">
-                <button className="rd-modal-cancel" onClick={closeModal}>Cancel</button>
+                <button className="rd-modal-cancel" onClick={closeModal}>Cancelar</button>
                 <button className="rd-modal-save" onClick={handleSave} disabled={saving}>
                   {saving && <span className="rd-spinner" />}
-                  {saving ? "Saving…" : editingItem ? "Save changes" : "Add to menu"}
+                  {saving ? "Guardando…" : editingItem ? "Guardar cambios" : "Agregar al menú"}
                 </button>
               </div>
             </div>
@@ -914,15 +895,15 @@ export default function RestaurantDashboard() {
           <div className="rd-overlay" onClick={() => setDeleteId(null)}>
             <div className="rd-delete-modal" onClick={e => e.stopPropagation()}>
               <div className="rd-delete-icon">🗑️</div>
-              <h3>Remove this item?</h3>
+              <h3>¿Eliminar este producto?</h3>
               <p>
                 This will remove <strong style={{ color: "#fff" }}>
                   {items.find(i => i.id === deleteId)?.name}
-                </strong> from your menu. This action cannot be undone.
+                </strong> de tu menú. Esta acción no se puede deshacer.
               </p>
               <div className="rd-delete-actions">
-                <button className="rd-delete-cancel" onClick={() => setDeleteId(null)}>Cancel</button>
-                <button className="rd-delete-confirm" onClick={handleDelete}>Yes, remove</button>
+                <button className="rd-delete-cancel" onClick={() => setDeleteId(null)}>Cancelar</button>
+                <button className="rd-delete-confirm" onClick={handleDelete}>Sí, eliminar</button>
               </div>
             </div>
           </div>

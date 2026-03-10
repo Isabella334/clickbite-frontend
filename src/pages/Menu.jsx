@@ -22,16 +22,16 @@ export default function Menu() {
 
   const [restaurant,     setRestaurant]     = useState(null);
   const [menuItems,      setMenuItems]      = useState([]);
-  const [categories,     setCategories]     = useState(["All"]);
+  const [categories,     setCategories]     = useState(["Todos"]);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState(null);
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeCategory, setActiveCategory] = useState("Todos");
   const [cart,           setCart]           = useState({}); // { itemId: quantity }
   const [cartOpen,       setCartOpen]       = useState(false);
 
   // ── Fetch restaurant + menu items ────────────────────────────────────────
   useEffect(() => {
-    if (!restaurantId) { setError("No restaurant selected."); setLoading(false); return; }
+    if (!restaurantId) { setError("No se seleccionó ningún restaurante."); setLoading(false); return; }
 
     Promise.all([
       restaurantsApi.getById(restaurantId),
@@ -41,7 +41,7 @@ export default function Menu() {
         setRestaurant(rest);
         const mapped = (items ?? []).map(helpers.toMenuItem);
         setMenuItems(mapped);
-        const cats = ["All", ...new Set(mapped.map(i => i.category).filter(Boolean))];
+        const cats = ["Todos", ...new Set(mapped.map(i => i.category).filter(Boolean))];
         setCategories(cats);
       })
       .catch(err => setError(err.message))
@@ -70,7 +70,7 @@ export default function Menu() {
   const cartTotal = cartItems.reduce((sum, i) => sum + (i.price ?? 0) * i.qty, 0);
   const cartCount = cartItems.reduce((sum, i) => sum + i.qty, 0);
 
-  const filteredItems = activeCategory === "All"
+  const filteredItems = activeCategory === "Todos"
     ? menuItems
     : menuItems.filter(i => i.category === activeCategory);
 
@@ -638,7 +638,7 @@ export default function Menu() {
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", gap: 12, fontFamily: "'DM Sans', sans-serif" }}>
             <div style={{ fontSize: "2rem" }}>⚠️</div>
             <div style={{ color: "#e05c5c" }}>{error}</div>
-            <button onClick={() => navigate("/restaurants")} style={{ marginTop: 8, padding: "10px 20px", background: "#52c49b", border: "none", borderRadius: 8, color: "#0d1f1c", fontWeight: 700, cursor: "pointer" }}>← Back to restaurants</button>
+            <button onClick={() => navigate("/restaurants")} style={{ marginTop: 8, padding: "10px 20px", background: "#52c49b", border: "none", borderRadius: 8, color: "#0d1f1c", fontWeight: 700, cursor: "pointer" }}>← Volver a restaurantes</button>
           </div>
         )}
         {!loading && !error && restaurant && (<>
@@ -646,7 +646,7 @@ export default function Menu() {
         {/* NAVBAR */}
         <nav className="mn-nav">
           <button className="mn-nav-back" onClick={() => navigate("/restaurants")}>
-            ← Back
+            ← Volver
           </button>
           <div className="mn-nav-logo">Click<span>Bite</span></div>
           <button
@@ -654,7 +654,7 @@ export default function Menu() {
             onClick={() => setCartOpen(true)}
             disabled={cartCount === 0}
           >
-            🛒 Cart
+            🛒 Carrito
             {cartCount > 0 && <span className="mn-cart-badge">{cartCount}</span>}
           </button>
         </nav>
@@ -670,12 +670,12 @@ export default function Menu() {
             <div className="mn-header-top">
               <h1 className="mn-header-name">{restaurant.name}</h1>
               <span className={"mn-open-badge " + (restaurant.is_active ? "open" : "closed")}>
-                {restaurant.is_active ? "● Open" : "● Closed"}
+                {restaurant.is_active ? "● Abierto" : "● Cerrado"}
               </span>
             </div>
             <p className="mn-header-desc">{restaurant.description}</p>
             <div className="mn-header-meta">
-              <span className="mn-meta-item">⭐ <strong>{(restaurant.avg_rating ?? 0).toFixed(1)}</strong> ({restaurant.total_reviews ?? 0} reviews)</span>
+              <span className="mn-meta-item">⭐ <strong>{(restaurant.avg_rating ?? 0).toFixed(1)}</strong> ({restaurant.total_reviews ?? 0} reseñas)</span>
               <span className="mn-meta-item">📞 <strong>{restaurant.contact?.phone ?? "—"}</strong></span>
               <span className="mn-meta-item">✉️ <strong>{restaurant.contact?.email ?? "—"}</strong></span>
             </div>
@@ -703,9 +703,9 @@ export default function Menu() {
 
           {/* ITEMS */}
           <main className="mn-content">
-            {activeCategory === "All" ? (
-              // Agrupa por categoría cuando se muestra "All"
-              categories.filter(c => c !== "All").map(cat => {
+            {activeCategory === "Todos" ? (
+              // Agrupa por categoría cuando se muestra "Todos"
+              categories.filter(c => c !== "Todos").map(cat => {
                 const items = menuItems.filter(i => i.category === cat);
                 if (items.length === 0) return null;
                 return (
@@ -754,14 +754,14 @@ export default function Menu() {
             <div className="mn-overlay" onClick={() => setCartOpen(false)} />
             <div className="mn-drawer">
               <div className="mn-drawer-header">
-                <span className="mn-drawer-title">Your Order</span>
+                <span className="mn-drawer-title">Tu pedido</span>
                 <button className="mn-drawer-close" onClick={() => setCartOpen(false)}>✕</button>
               </div>
 
               {cartItems.length === 0 ? (
                 <div className="mn-empty-cart">
                   <div className="mn-empty-cart-icon">🛒</div>
-                  <p>Your cart is empty.<br />Add items from the menu.</p>
+                  <p>Tu carrito está vacío.<br />Agrega productos del menú.</p>
                 </div>
               ) : (
                 <>
@@ -794,7 +794,7 @@ export default function Menu() {
                       </div>
                     </div>
                     <button className="mn-checkout-btn" onClick={handleConfirmOrder}>
-                      Confirm Order →
+                      Confirmar pedido →
                     </button>
                   </div>
                 </>
@@ -827,7 +827,7 @@ function ItemCard({ item, qty, onAdd, onRemove, delay, color }) {
           <span className="mn-card-price">${item.price.toFixed(2)}</span>
           <div className="mn-qty">
             {qty === 0 ? (
-              <button className="mn-qty-btn add-first" onClick={onAdd}>+ Add</button>
+              <button className="mn-qty-btn add-first" onClick={onAdd}>+ Agregar</button>
             ) : (
               <>
                 <button className="mn-qty-btn" onClick={onRemove}>−</button>

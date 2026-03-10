@@ -442,7 +442,7 @@ export default function Restaurants() {
             <span className="rs-search-icon">🔍</span>
             <input
               type="text"
-              placeholder="Search restaurants or cuisines…"
+              placeholder="Buscar restaurantes o categorías…"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -450,7 +450,7 @@ export default function Restaurants() {
 
           <div className="rs-nav-right">
             <button className="rs-nav-history" onClick={() => navigate("/order-history")}>
-              📋 My Orders
+              📋 Mis pedidos
             </button>
             <div className="rs-avatar" title="Profile">👤</div>
           </div>
@@ -459,8 +459,8 @@ export default function Restaurants() {
         {/* MAIN */}
         <main className="rs-main">
           <div className="rs-hero">
-            <h1>What are you <em>craving</em> today?</h1>
-            <p>Choose from {allRestaurants.length} restaurants near you</p>
+            <h1>¿Qué se te <em>antoja</em> hoy?</h1>
+            <p>Elige entre {allRestaurants.length} restaurantes cerca de ti</p>
           </div>
 
           <div className="rs-controls">
@@ -477,35 +477,33 @@ export default function Restaurants() {
             </div>
 
             <div className="rs-sort">
-              <span>Sort by</span>
+              <span>Ordenar por</span>
               <select value={sortBy} onChange={e => setSortBy(e.target.value)}>
-                <option value="rating">Top rated</option>
-                <option value="time">Fastest</option>
-                <option value="delivery">Delivery fee</option>
+                <option value="rating">Mejor calificados</option>
               </select>
             </div>
           </div>
 
           <div className="rs-count">
-            Showing <strong>{filtered.length}</strong> restaurant{filtered.length !== 1 ? "s" : ""}
-            {activeCategory !== "All" && <> in <strong>{activeCategory}</strong></>}
+            Mostrando <strong>{filtered.length}</strong> restaurante{filtered.length !== 1 ? "s" : ""}
+            {activeCategory !== "All" && <> en <strong>{activeCategory}</strong></>}
           </div>
 
           <div className="rs-grid">
             {loading ? (
               <div className="rs-empty">
                 <div className="rs-empty-icon">⏳</div>
-                <p>Loading restaurants…</p>
+                <p>Cargando restaurantes…</p>
               </div>
             ) : error ? (
               <div className="rs-empty">
                 <div className="rs-empty-icon">⚠️</div>
-                <p>Could not load restaurants: {error}</p>
+                <p>No se pudieron cargar los restaurantes: {error}</p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="rs-empty">
                 <div className="rs-empty-icon">🍽️</div>
-                <p>No restaurants found. Try a different search.</p>
+                <p>No se encontraron restaurantes. Intenta con otra búsqueda.</p>
               </div>
             ) : (
               filtered.map((r, i) => {
@@ -533,7 +531,7 @@ export default function Restaurants() {
                       </div>
 
                       <div className="rs-card-meta">
-                        <span className="rs-card-meta-item">💬 {r.total_reviews ?? 0} reviews</span>
+                        <span className="rs-card-meta-item">💬 {r.total_reviews ?? 0} reseñas</span>
                         <span className="rs-card-meta-item">📞 {r.contact?.phone ?? "—"}</span>
                       </div>
 
@@ -543,7 +541,7 @@ export default function Restaurants() {
                           className="rs-card-btn"
                           onClick={e => { e.stopPropagation(); navigate("/menu", { state: { restaurantId: r.id } }); }}
                         >
-                          View Menu →
+                          Ver menú →
                         </button>
                       </div>
                     </div>

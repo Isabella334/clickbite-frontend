@@ -41,31 +41,31 @@ const initialOrders = [
 // ─────────────────────────────────────────────
 
 const STATUS_CONFIG = {
-  pending:    { label: "Pending",    color: "#94a3b8", bg: "rgba(148,163,184,0.12)", icon: "🕐" },
-  confirmed:  { label: "Confirmed",  color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  icon: "✅" },
-  preparing:  { label: "Preparing",  color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  icon: "👨‍🍳" },
-  on_the_way: { label: "On the way", color: "#a78bfa", bg: "rgba(167,139,250,0.12)", icon: "🛵" },
-  delivered:  { label: "Delivered",  color: "#52c49b", bg: "rgba(82,196,155,0.12)",  icon: "✓"  },
-  cancelled:  { label: "Cancelled",  color: "#e05c5c", bg: "rgba(224,92,92,0.12)",   icon: "✕"  },
+  pending:    { label: "Pendiente",  color: "#94a3b8", bg: "rgba(148,163,184,0.12)", icon: "🕐" },
+  confirmed:  { label: "Confirmado", color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  icon: "✅" },
+  preparing:  { label: "Preparando", color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  icon: "👨‍🍳" },
+  on_the_way: { label: "En camino",  color: "#a78bfa", bg: "rgba(167,139,250,0.12)", icon: "🛵" },
+  delivered:  { label: "Entregado",  color: "#52c49b", bg: "rgba(82,196,155,0.12)",  icon: "✓"  },
+  cancelled:  { label: "Cancelado",  color: "#e05c5c", bg: "rgba(224,92,92,0.12)",   icon: "✕"  },
 };
 
 // Next logical status for each state
 const NEXT_STATUS = {
-  pending:    { status: "confirmed",  label: "Confirm order",  icon: "✅" },
-  confirmed:  { status: "preparing",  label: "Start preparing", icon: "👨‍🍳" },
-  preparing:  { status: "on_the_way", label: "Out for delivery", icon: "🛵" },
-  on_the_way: { status: "delivered",  label: "Mark delivered",  icon: "✓"  },
+  pending:    { status: "confirmed",  label: "Confirmar pedido",   icon: "✅" },
+  confirmed:  { status: "preparing",  label: "Empezar preparación", icon: "👨‍🍳" },
+  preparing:  { status: "on_the_way", label: "Salió a entregar",    icon: "🛵" },
+  on_the_way: { status: "delivered",  label: "Marcar entregado",    icon: "✓"  },
 };
 
-const FILTERS = ["All", "Pending", "Preparing", "On the way", "Delivered", "Cancelled"];
+const FILTERS = ["Todos", "Pendientes", "Preparando", "En camino", "Entregados", "Cancelados"];
 
 const filterMap = {
-  "All": null,
-  "Pending": "pending",
-  "Preparing": "preparing",
-  "On the way": "on_the_way",
-  "Delivered": "delivered",
-  "Cancelled": "cancelled",
+  "Todos":      null,
+  "Pendientes": "pending",
+  "Preparando": "preparing",
+  "En camino":  "on_the_way",
+  "Entregados": "delivered",
+  "Cancelados": "cancelled",
 };
 
 export default function RestaurantOrders() {
@@ -408,18 +408,18 @@ export default function RestaurantOrders() {
             </div>
           </div>
 
-          <div className="ro-nav-section">Menu</div>
+          <div className="ro-nav-section">Menú</div>
 
           <button className="ro-nav-item" onClick={() => navigate("/restaurant-dashboard")}>
-            <span>📊</span> Dashboard
+            <span>🍽️</span> Dashboard
           </button>
           <button className="ro-nav-item active">
-            <span>📋</span> Orders
+            <span>📋</span> Pedidos
             {pendingCount > 0 && <span className="ro-nav-badge">{pendingCount}</span>}
           </button>
 
           <div className="ro-sidebar-bottom">
-            <button className="ro-logout" onClick={() => navigate("/")}>← Log out</button>
+            <button className="ro-logout" onClick={() => navigate("/")}>← Cerrar sesión</button>
           </div>
         </aside>
 
@@ -427,15 +427,15 @@ export default function RestaurantOrders() {
         <div className="ro-main">
           <div className="ro-topbar">
             <div>
-              <div className="ro-topbar-title">Orders</div>
-              <div className="ro-topbar-sub">{orders.length} total · {pendingCount} pending</div>
+              <div className="ro-topbar-title">Pedidos</div>
+              <div className="ro-topbar-sub">{orders.length} en total · {pendingCount} pendiente{pendingCount !== 1 ? "s" : ""}</div>
             </div>
             <div className="ro-search-wrap">
               <span className="ro-search-icon">🔍</span>
               <input
                 className="ro-search"
                 type="text"
-                placeholder="Search order or customer…"
+                placeholder="Buscar pedido o cliente…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -453,10 +453,10 @@ export default function RestaurantOrders() {
                   onClick={() => setFilter(f)}
                 >
                   {f}
-                  {f === "Pending" && pendingCount > 0 && (
+                  {f === "Pendientes" && pendingCount > 0 && (
                     <span style={{
-                      marginLeft: 6, background: filter === "Pending" ? "#0d1f1c" : "#e05c5c",
-                      color: filter === "Pending" ? "#52c49b" : "#fff",
+                      marginLeft: 6, background: filter === "Pendientes" ? "#0d1f1c" : "#e05c5c",
+                      color: filter === "Pendientes" ? "#52c49b" : "#fff",
                       borderRadius: "999px", padding: "0px 6px",
                       fontSize: "0.7rem", fontWeight: 700,
                     }}>
@@ -468,14 +468,14 @@ export default function RestaurantOrders() {
             </div>
 
             <div className="ro-count">
-              Showing <strong>{filtered.length}</strong> order{filtered.length !== 1 ? "s" : ""}
+              Mostrando <strong>{filtered.length}</strong> pedido{filtered.length !== 1 ? "s" : ""}
             </div>
 
             {/* ORDERS */}
             {filtered.length === 0 ? (
               <div className="ro-empty">
                 <div className="ro-empty-icon">📭</div>
-                <p>No orders in this category.</p>
+                <p>No hay pedidos en esta categoría.</p>
               </div>
             ) : (
               filtered.map((order, i) => {
@@ -508,27 +508,27 @@ export default function RestaurantOrders() {
                       <div className="ro-details">
                         <div className="ro-details-grid">
                           <div className="ro-detail-block">
-                            <div className="ro-detail-label">Order ID</div>
+                            <div className="ro-detail-label">ID del pedido</div>
                             <div className="ro-detail-value" style={{ fontFamily: "monospace", fontSize: "0.78rem" }}>{order.id}</div>
                           </div>
                           <div className="ro-detail-block">
-                            <div className="ro-detail-label">Customer</div>
+                            <div className="ro-detail-label">Cliente</div>
                             <div className="ro-detail-value">{order.customer}</div>
                           </div>
                           <div className="ro-detail-block">
-                            <div className="ro-detail-label">Delivery point</div>
+                            <div className="ro-detail-label">Punto de entrega</div>
                             <div className="ro-detail-value">📍 {order.deliveryPoint}</div>
                           </div>
                           <div className="ro-detail-block">
-                            <div className="ro-detail-label">Placed at</div>
+                            <div className="ro-detail-label">Hora del pedido</div>
                             <div className="ro-detail-value">{order.placedAt}</div>
                           </div>
                           <div className="ro-detail-block">
-                            <div className="ro-detail-label">Payment</div>
-                            <div className="ro-detail-value">💳 Card</div>
+                            <div className="ro-detail-label">Pago</div>
+                            <div className="ro-detail-value">💳 Tarjeta</div>
                           </div>
                           <div className="ro-detail-block">
-                            <div className="ro-detail-label">Status</div>
+                            <div className="ro-detail-label">Estado</div>
                             <div className="ro-detail-value" style={{ color: st.color }}>{st.icon} {st.label}</div>
                           </div>
                         </div>
@@ -536,7 +536,7 @@ export default function RestaurantOrders() {
                         {/* ITEMS TABLE */}
                         <div className="ro-items-table">
                           <div className="ro-items-header">
-                            <span>Item</span><span>Qty</span><span>Price</span>
+                            <span>Producto</span><span>Cant.</span><span>Precio</span>
                           </div>
                           {order.items.map((item, idx) => (
                             <div key={idx} className="ro-item-row">
@@ -555,7 +555,7 @@ export default function RestaurantOrders() {
                         {/* NOTES */}
                         {order.notes && (
                           <div className="ro-notes">
-                            ⚠️ <span><strong style={{ color: "#f59e0b" }}>Customer note:</strong> {order.notes}</span>
+                            ⚠️ <span><strong style={{ color: "#f59e0b" }}>Nota del cliente:</strong> {order.notes}</span>
                           </div>
                         )}
 
@@ -574,7 +574,7 @@ export default function RestaurantOrders() {
                                   className="ro-btn-cancel"
                                   onClick={() => cancelOrder(order.id)}
                                 >
-                                  Cancel order
+                                  Cancelar pedido
                                 </button>
                               )}
                             </>

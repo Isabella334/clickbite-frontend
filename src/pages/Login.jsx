@@ -22,11 +22,11 @@ export default function Login() {
 
   const validate = () => {
     const e = {};
-    if (mode === "register" && !form.name.trim()) e.name = "Name is required";
-    if (!form.email.includes("@")) e.email = "Enter a valid email";
-    if (form.password.length < 6) e.password = "At least 6 characters";
+    if (mode === "register" && !form.name.trim()) e.name = "El nombre es obligatorio";
+    if (!form.email.includes("@")) e.email = "Ingresa un correo válido";
+    if (form.password.length < 6) e.password = "Mínimo 6 caracteres";
     if (mode === "register" && form.password !== form.confirmPassword)
-      e.confirmPassword = "Passwords don't match";
+      e.confirmPassword = "Las contraseñas no coinciden";
     return e;
   };
 
@@ -381,18 +381,14 @@ export default function Login() {
         <div className="cb-left">
           <div className="cb-brand">
             <div className="cb-brand-logo">Click<span>Bite</span></div>
-            <div className="cb-brand-tagline">Food delivery, reimagined</div>
           </div>
 
           <div className="cb-hero-text">
             <h2>
-              Your favorite<br />
-              food, <em>delivered</em><br />
-              instantly.
+              Tu comida<br />
+              favorita, <em>entregada</em><br />
+              al instante.
             </h2>
-            <p>
-              Discover hundreds of restaurants near you and get fresh meals delivered right to your door.
-            </p>
           </div>
         </div>
 
@@ -403,34 +399,29 @@ export default function Login() {
               className={"cb-mode-btn" + (mode === "login" ? " active" : "")}
               onClick={() => { setMode("login"); setErrors({}); }}
             >
-              Sign In
+              Iniciar sesión
             </button>
             <button
               className={"cb-mode-btn" + (mode === "register" ? " active" : "")}
               onClick={() => { setMode("register"); setErrors({}); }}
             >
-              Create Account
+              Crear cuenta
             </button>
           </div>
 
           <div className="cb-form-area" key={mode}>
             <div className="cb-form-heading">
-              <h1>{mode === "login" ? "Welcome back" : "Join ClickBite"}</h1>
-              <p>
-                {mode === "login"
-                  ? "Enter your credentials to continue"
-                  : "Create your account to get started"}
-              </p>
+              <h1>{mode === "login" ? "Bienvenido de nuevo" : "Únete a ClickBite"}</h1>
             </div>
 
             {/* Restaurants are created by admin — register is customer only */}
 
             {mode === "register" && (
               <div className="cb-field">
-                <label>Full Name</label>
+                <label>Nombre completo</label>
                 <input
                   type="text"
-                  placeholder="Jane Smith"
+                  placeholder="Juan García"
                   className={errors.name ? "error" : ""}
                   value={form.name}
                   onChange={e => handleChange("name", e.target.value)}
@@ -440,10 +431,10 @@ export default function Login() {
             )}
 
             <div className="cb-field">
-              <label>Email</label>
+              <label>Correo electrónico</label>
               <input
                 type="email"
-                placeholder="you@example.com"
+                placeholder="tú@ejemplo.com"
                 className={errors.email ? "error" : ""}
                 value={form.email}
                 onChange={e => handleChange("email", e.target.value)}
@@ -452,7 +443,7 @@ export default function Login() {
             </div>
 
             <div className="cb-field">
-              <label>Password</label>
+              <label>Contraseña</label>
               <input
                 type="password"
                 placeholder="••••••••"
@@ -465,7 +456,7 @@ export default function Login() {
 
             {mode === "register" && (
               <div className="cb-field">
-                <label>Confirm Password</label>
+                <label>Confirmar contraseña</label>
                 <input
                   type="password"
                   placeholder="••••••••"
