@@ -101,6 +101,41 @@ export const reviews = {
 };
 
 
+// FILES (GridFS)
+// POST /upload        - multipart/form-data, campo "file", devuelve { file_id, filename, size }
+// GET  /files/:id     - sirve la imagen directamente (usar como src de <img>)
+// DELETE /files/:id   - elimina la imagen
+export const files = {
+  // Sube una imagen. Recibe un File object del browser.
+  // Devuelve { file_id, filename, size, message }
+  upload: async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(BASE_URL + "/upload", {
+      method: "POST",
+      body: formData,
+      // NO incluir Content-Type header - el browser lo pone con el boundary
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const err = new Error(data.error || "Error " + res.status);
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  },
+
+  // URL para mostrar una imagen directamente en <img src={...}>
+  getUrl: (fileId) => {
+    if (!fileId) return null;
+    return BASE_URL + "/files/" + fileId;
+  },
+
+  // Elimina una imagen de GridFS
+  delete: (fileId) => request("DELETE", "/files/" + fileId),
+};
+
+
 // ANALYTICS
 export const analytics = {
   getTopRatedRestaurants: () => get("/analytics/top-restaurants"),
@@ -257,6 +292,7 @@ export const helpers = {
     stock:        m.stock,
     popular:      false,
     image:        "🍽️",
+    imageFileId:  m.image_file_id || null,
   }),
 };
 

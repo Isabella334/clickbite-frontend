@@ -2,14 +2,14 @@
 // STATIC CONFIG
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { menuItems as menuItemsApi, restaurants as restaurantsApi, analytics, helpers } from "../services/api";
+import { menuItems as menuItemsApi, restaurants as restaurantsApi, analytics, helpers, files as filesApi } from "../services/api";
 
 // ─────────────────────────────────────────────
 
 const CATEGORIES = ["Burgers", "Sides", "Drinks", "Desserts", "Entradas", "Platos principales", "Bebidas", "Postres", "Otros"];
 const EMOJI_OPTIONS = ["🍔","🥩","🍄","🌶️","🍟","🧅","🥗","🥤","🍋","🍫","🥧","🍕","🌮","🍜","🍣","🍛","🍗","🍝","🧁","☕"];
 const EMPTY_ITEM = { name: "", description: "", price: "", category: "Platos principales", image: "🍔", available: true };
-const EMPTY_FORM = { name: "", description: "", price: "", category: "Platos principales", image: "🍔", available: true, popular: false };
+const EMPTY_FORM = { name: "", description: "", price: "", category: "Platos principales", image: "🍔", available: true, popular: false, imageFileId: null, imageMode: "emoji" };
 const ONBOARD_STEPS = ["Tu restaurante", "Tu menu", "Confirmar"];
 
 const CSS = `
@@ -21,7 +21,7 @@ const CSS = `
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes toastIn{from{opacity:0;transform:translateY(12px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}}
 
-  /* ── Onboarding ── */
+  /* -- Onboarding -- */
   .ob-page{min-height:100vh;background:#0d1117;font-family:'DM Sans',sans-serif;color:#fff;display:flex;flex-direction:column;align-items:center;padding:48px 20px}
   .ob-logo{font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:#52c49b;margin-bottom:40px;letter-spacing:-0.5px}
   .ob-logo span{color:#fff}
@@ -70,7 +70,7 @@ const CSS = `
   .ob-items-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(82,196,155,0.1);border:1px solid rgba(82,196,155,0.2);border-radius:999px;color:#52c49b;font-size:0.8rem;font-weight:600;margin-bottom:8px}
   .ob-warning{padding:12px 14px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:10px;font-size:0.82rem;color:#fbbf24}
 
-  /* ── Dashboard ── */
+  /* -- Dashboard -- */
   .rd-page{min-height:100vh;background:#0d1117;font-family:'DM Sans',sans-serif;color:#fff;display:flex}
   .rd-sidebar{width:220px;min-width:220px;background:#111820;border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;padding:28px 0;position:sticky;top:0;height:100vh}
   .rd-sidebar-logo{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;color:#52c49b;letter-spacing:-0.5px;padding:0 24px;margin-bottom:32px}
@@ -225,6 +225,23 @@ const CSS = `
   .rd-bs-rank-3{border-color:rgba(205,127,50,0.2)}
   @media(max-width:720px){.rd-sidebar{display:none}.rd-content{padding:20px}.rd-topbar{padding:14px 20px}}
 
+  /* Image upload in modal */
+  .rd-img-mode-toggle{display:flex;gap:0;margin-bottom:12px;border:1px solid rgba(255,255,255,0.1);border-radius:9px;overflow:hidden}
+  .rd-img-mode-btn{flex:1;padding:8px;background:transparent;border:none;color:rgba(255,255,255,0.4);font-family:'DM Sans',sans-serif;font-size:0.82rem;cursor:pointer;transition:all 0.18s}
+  .rd-img-mode-btn.active{background:rgba(82,196,155,0.15);color:#52c49b;font-weight:600}
+  .rd-img-upload-area{border:2px dashed rgba(255,255,255,0.1);border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden}
+  .rd-img-upload-area:hover{border-color:rgba(82,196,155,0.4);background:rgba(82,196,155,0.04)}
+  .rd-img-upload-area.has-image{padding:0;border-style:solid;border-color:rgba(82,196,155,0.3)}
+  .rd-img-preview{width:100%;height:160px;object-fit:cover;border-radius:10px;display:block}
+  .rd-img-upload-icon{font-size:2rem;margin-bottom:8px}
+  .rd-img-upload-text{font-size:0.83rem;color:rgba(255,255,255,0.35);margin-bottom:4px}
+  .rd-img-upload-hint{font-size:0.73rem;color:rgba(255,255,255,0.2)}
+  .rd-img-upload-input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+  .rd-img-uploading{display:flex;align-items:center;justify-content:center;gap:8px;padding:20px;color:rgba(82,196,155,0.7);font-size:0.85rem}
+  .rd-img-change-btn{position:absolute;bottom:8px;right:8px;padding:5px 12px;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:6px;color:#fff;font-size:0.75rem;cursor:pointer}
+  .rd-img-err{font-size:0.76rem;color:#e05c5c;margin-top:4px}
+  .rd-table-img{width:40px;height:40px;border-radius:10px;object-fit:cover;flex-shrink:0}
+
   /* Shared field styles for onboarding */
   .ob-field{display:flex;flex-direction:column;gap:6px}
   .ob-field label{font-size:0.75rem;font-weight:600;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.07em}
@@ -263,6 +280,8 @@ export default function RestaurantDashboard() {
   const [form,        setForm]        = useState(EMPTY_FORM);
   const [formErrors,  setFormErrors]  = useState({});
   const [saving,      setSaving]      = useState(false);
+  const [uploading,   setUploading]   = useState(false);
+  const [uploadPreview, setUploadPreview] = useState(null); // base64 preview URL
 
   // Delete confirm (single or bulk)
   const [deleteTarget, setDeleteTarget] = useState(null); // { ids: string[], labels: string[] }
@@ -287,7 +306,7 @@ export default function RestaurantDashboard() {
   const [obErrors,    setObErrors]    = useState({});
   const [obSaving,    setObSaving]    = useState(false);
 
-  // ── Load ──
+  // -- Load --
   useEffect(() => {
     if (!session) { navigate("/"); return; }
     const load = async () => {
@@ -318,7 +337,7 @@ export default function RestaurantDashboard() {
         ]);
         setItems((rawItems ?? []).map(helpers.toMenuItem));
         setBestsellers((topItems ?? []).slice(0, 5).map(t => ({
-          id: t.menu_item_id ?? t._id, name: t.name ?? t.item_name ?? "—",
+          id: t.menu_item_id ?? t._id, name: t.name ?? t.item_name ?? "-",
           image: "🍽️", totalSold: t.total_sold ?? t.totalSold ?? 0,
         })));
       } catch (err) { setError(err.message); }
@@ -327,7 +346,7 @@ export default function RestaurantDashboard() {
     load();
   }, []);
 
-  // ── Helpers: selection ──
+  // -- Helpers: selection --
   const availableCategories = [...new Set(items.map(i => i.category).filter(Boolean))];
 
   const filtered = items.filter(i => {
@@ -353,7 +372,7 @@ export default function RestaurantDashboard() {
 
   const selectedItems = items.filter(i => selected.has(i.id));
 
-  // ── Bulk actions ──
+  // -- Bulk actions --
   const bulkSetAvailable = async (value) => {
     const ids = [...selected];
     try {
@@ -397,10 +416,10 @@ export default function RestaurantDashboard() {
     finally { setDeleteTarget(null); }
   };
 
-  // ── Item CRUD ──
-  const openCreate = () => { setEditingItem(null); setForm(EMPTY_FORM); setFormErrors({}); setModalOpen(true); };
-  const openEdit   = (item) => { setEditingItem(item); setForm({ ...item, price: String(item.price) }); setFormErrors({}); setModalOpen(true); };
-  const closeModal = () => { setModalOpen(false); setEditingItem(null); };
+  // -- Item CRUD --
+  const openCreate = () => { setEditingItem(null); setForm(EMPTY_FORM); setFormErrors({}); setUploadPreview(null); setModalOpen(true); };
+  const openEdit   = (item) => { setEditingItem(item); setForm({ ...item, price: String(item.price), imageMode: item.imageFileId ? 'upload' : 'emoji' }); setFormErrors({}); setUploadPreview(item.imageFileId ? null : null); setModalOpen(true); };
+  const closeModal = () => { setModalOpen(false); setEditingItem(null); setUploadPreview(null); };
 
   const validateItem = () => {
     const e = {};
@@ -410,22 +429,52 @@ export default function RestaurantDashboard() {
     return e;
   };
 
+  // Handles file input change: shows local preview immediately,
+  // uploads to GridFS, saves the returned file_id in form state.
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Show local preview immediately
+    const reader = new FileReader();
+    reader.onload = (ev) => setUploadPreview(ev.target.result);
+    reader.readAsDataURL(file);
+
+    setUploading(true);
+    try {
+      const result = await filesApi.upload(file);
+      handleFormChange("imageFileId", result.file_id);
+      handleFormChange("imageMode", "upload");
+    } catch (err) {
+      setFormErrors(prev => ({ ...prev, image: "Error subiendo imagen: " + err.message }));
+      setUploadPreview(null);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSaveItem = async () => {
     const e = validateItem();
     if (Object.keys(e).length) { setFormErrors(e); return; }
     setSaving(true);
     try {
+      const imageFileId = form.imageMode === "upload" && form.imageFileId ? form.imageFileId : undefined;
       if (editingItem) {
         // UpdateOne via PUT /menu-items/:id
-        await menuItemsApi.update(editingItem.id, {
+        const updatePayload = {
           name: form.name, description: form.description,
           price: parseFloat(form.price), category: form.category,
           is_available: form.available, stock: editingItem.stock ?? 99,
-        });
-        setItems(prev => prev.map(i => i.id === editingItem.id ? { ...i, ...form, price: parseFloat(form.price) } : i));
+        };
+        if (imageFileId) updatePayload.image_file_id = imageFileId;
+        await menuItemsApi.update(editingItem.id, updatePayload);
+        setItems(prev => prev.map(i => i.id === editingItem.id
+          ? { ...i, ...form, price: parseFloat(form.price), imageFileId: imageFileId || i.imageFileId }
+          : i));
         showToast("Producto actualizado");
       } else {
         const payload = helpers.toCreateMenuItemPayload(restaurant.id, { ...form });
+        if (imageFileId) payload.image_file_id = imageFileId;
         const created = await menuItemsApi.create(payload);
         setItems(prev => [...prev, helpers.toMenuItem(created)]);
         showToast("Producto agregado al menu");
@@ -451,7 +500,7 @@ export default function RestaurantDashboard() {
     } catch (err) { showToast("Error: " + err.message); }
   };
 
-  // ── Edit restaurant ──
+  // -- Edit restaurant --
   const openRestModal = () => { setRestErrors({}); setRestModalOpen(true); };
 
   const validateRest = () => {
@@ -490,7 +539,7 @@ export default function RestaurantDashboard() {
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
 
-  // ── Onboarding ──
+  // -- Onboarding --
   const validateObStep = () => {
     const e = {};
     if (obStep === 0) {
@@ -532,7 +581,7 @@ export default function RestaurantDashboard() {
     finally { setObSaving(false); }
   };
 
-  // ── Loading / error screens ──
+  // -- Loading / error screens --
   if (loading) return (
     <div style={{ minHeight:"100vh", background:"#0d1117", display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.4)", fontFamily:"DM Sans,sans-serif", gap:12 }}>
       <div style={{ width:20, height:20, border:"2px solid rgba(82,196,155,0.3)", borderTopColor:"#52c49b", borderRadius:"50%", animation:"spin 0.7s linear infinite" }} />
@@ -548,9 +597,9 @@ export default function RestaurantDashboard() {
   );
 
   const restName     = restaurant?.name ?? session?.name ?? "Mi Restaurante";
-  const restCategory = restaurant?.categories?.[0] ?? "—";
+  const restCategory = restaurant?.categories?.[0] ?? "-";
 
-  // ── ONBOARDING ──
+  // -- ONBOARDING --
   if (onboarding) return (
     <>
       <style>{CSS}</style>
@@ -597,7 +646,7 @@ export default function RestaurantDashboard() {
               {obMenuItems.length > 0 && <div className="ob-item-list">{obMenuItems.map(item=>(
                 <div key={item._key} className="ob-item-chip">
                   <div className="ob-item-chip-emoji">{item.image}</div>
-                  <div className="ob-item-chip-info"><div className="ob-item-chip-name">{item.name}</div><div className="ob-item-chip-meta">{item.category}{item.description?" · "+item.description:""}</div></div>
+                  <div className="ob-item-chip-info"><div className="ob-item-chip-name">{item.name}</div><div className="ob-item-chip-meta">{item.category}{item.description?" - "+item.description:""}</div></div>
                   <div className="ob-item-chip-price">Q{item.price.toFixed(2)}</div>
                   <button className="ob-item-chip-del" onClick={()=>obRemoveItem(item._key)}>quitar</button>
                 </div>
@@ -615,7 +664,7 @@ export default function RestaurantDashboard() {
               <div className="ob-review-section">
                 <div className="ob-review-title">Menu inicial</div>
                 {obMenuItems.length === 0
-                  ? <div style={{fontSize:"0.85rem",color:"rgba(255,255,255,0.25)"}}>Sin productos — puedes agregarlos despues.</div>
+                  ? <div style={{fontSize:"0.85rem",color:"rgba(255,255,255,0.25)"}}>Sin productos - puedes agregarlos despues.</div>
                   : <>{obMenuItems.map(item=>(
                       <div key={item._key} style={{display:"flex",alignItems:"center",gap:8,fontSize:"0.84rem",color:"rgba(255,255,255,0.55)",marginTop:6}}>
                         <span>{item.image}</span><span style={{flex:1}}>{item.name}</span>
@@ -639,7 +688,7 @@ export default function RestaurantDashboard() {
     </>
   );
 
-  // ── DASHBOARD ──
+  // -- DASHBOARD --
   return (
     <>
       <style>{CSS}</style>
@@ -668,7 +717,7 @@ export default function RestaurantDashboard() {
           <div className="rd-topbar">
             <div>
               <div className="rd-topbar-title">Gestion del menu</div>
-              <div className="rd-topbar-sub">{items.length} productos · {items.filter(i=>!i.available).length} no disponibles</div>
+              <div className="rd-topbar-sub">{items.length} productos - {items.filter(i=>!i.available).length} no disponibles</div>
             </div>
             <div className="rd-topbar-right">
               <div className="rd-search-wrap">
@@ -702,7 +751,7 @@ export default function RestaurantDashboard() {
               ))}
             </div>
 
-            {/* Bulk action bar — visible only when items are selected */}
+            {/* Bulk action bar - visible only when items are selected */}
             {selected.size > 0 && (
               <div className="rd-bulk-bar">
                 <span className="rd-bulk-count">{selected.size} seleccionado{selected.size !== 1 ? "s" : ""}</span>
@@ -757,7 +806,10 @@ export default function RestaurantDashboard() {
                         </td>
                         <td>
                           <div className="rd-item-info">
-                            <div className="rd-item-emoji">{item.image}</div>
+                            {item.imageFileId
+                              ? <img className="rd-table-img" src={filesApi.getUrl(item.imageFileId)} alt={item.name} onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="flex"}}/>
+                              : null}
+                            <div className="rd-item-emoji" style={item.imageFileId?{display:"none"}:{}}>{item.image}</div>
                             <div><div className="rd-item-name">{item.name}</div><div className="rd-item-desc">{item.description}</div></div>
                           </div>
                         </td>
@@ -793,8 +845,45 @@ export default function RestaurantDashboard() {
                 <button className="rd-modal-close" onClick={closeModal}>x</button>
               </div>
               <div className="rd-modal-body">
-                <div className="rd-field"><label>Icono</label>
-                  <div className="rd-emoji-grid">{EMOJI_OPTIONS.map(e=><button key={e} className={"rd-emoji-opt"+(form.image===e?" selected":"")} onClick={()=>handleFormChange("image",e)}>{e}</button>)}</div>
+                <div className="rd-field">
+                  <label>Imagen del producto</label>
+                  <div className="rd-img-mode-toggle">
+                    <button className={"rd-img-mode-btn"+(form.imageMode==="upload"?" active":"")} onClick={()=>handleFormChange("imageMode","upload")}>Subir imagen</button>
+                    <button className={"rd-img-mode-btn"+(form.imageMode==="emoji"?" active":"")} onClick={()=>handleFormChange("imageMode","emoji")}>Usar emoji</button>
+                  </div>
+                  {form.imageMode==="upload" && (
+                    <div className={"rd-img-upload-area"+(uploadPreview||form.imageFileId?" has-image":"")}>
+                      {uploading ? (
+                        <div className="rd-img-uploading">
+                          <div style={{width:16,height:16,border:"2px solid rgba(82,196,155,0.3)",borderTopColor:"#52c49b",borderRadius:"50%",animation:"spin 0.6s linear infinite"}}/>
+                          Subiendo imagen...
+                        </div>
+                      ) : uploadPreview ? (
+                        <>
+                          <img className="rd-img-preview" src={uploadPreview} alt="preview"/>
+                          <div className="rd-img-change-btn">Cambiar</div>
+                          <input type="file" accept="image/*" className="rd-img-upload-input" onChange={handleImageUpload}/>
+                        </>
+                      ) : form.imageFileId ? (
+                        <>
+                          <img className="rd-img-preview" src={filesApi.getUrl(form.imageFileId)} alt="preview"/>
+                          <div className="rd-img-change-btn">Cambiar</div>
+                          <input type="file" accept="image/*" className="rd-img-upload-input" onChange={handleImageUpload}/>
+                        </>
+                      ) : (
+                        <>
+                          <div className="rd-img-upload-icon">🖼️</div>
+                          <div className="rd-img-upload-text">Haz clic para subir una imagen</div>
+                          <div className="rd-img-upload-hint">JPG, PNG, WebP - max 5 MB</div>
+                          <input type="file" accept="image/*" className="rd-img-upload-input" onChange={handleImageUpload}/>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {form.imageMode==="emoji" && (
+                    <div className="rd-emoji-grid">{EMOJI_OPTIONS.map(e=><button key={e} className={"rd-emoji-opt"+(form.image===e?" selected":"")} onClick={()=>handleFormChange("image",e)}>{e}</button>)}</div>
+                  )}
+                  {formErrors.image && <div className="rd-img-err">{formErrors.image}</div>}
                 </div>
                 <div className="rd-field"><label>Nombre</label><input type="text" placeholder="Ej. Hamburguesa Clasica" className={formErrors.name?"err":""} value={form.name} onChange={e=>handleFormChange("name",e.target.value)}/>{formErrors.name&&<span className="rd-field-error">{formErrors.name}</span>}</div>
                 <div className="rd-field"><label>Descripcion</label><textarea rows={2} placeholder="Ingredientes..." className={formErrors.description?"err":""} value={form.description} onChange={e=>handleFormChange("description",e.target.value)}/>{formErrors.description&&<span className="rd-field-error">{formErrors.description}</span>}</div>
