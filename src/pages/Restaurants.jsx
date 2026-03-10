@@ -551,7 +551,7 @@ export default function Restaurants() {
                         className="rs-top-row"
                         onClick={() => navigate("/menu", { state: { restaurantId: r.restaurant_id } })}
                       >
-                        <div className={"rs-top-rank " + rankClass}>{i + 1}</div>
+                        <div className={"rs-top-rank " + rankClass}>{_i + 1}</div>
                         <div className="rs-top-emoji">{style.image}</div>
                         <div className="rs-top-info">
                           <div className="rs-top-name">{r.name}</div>
