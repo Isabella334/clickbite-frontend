@@ -41,6 +41,10 @@ export const restaurants = {
   create:  (data)       => post("/restaurants", data),
   update:  (id, data)   => put("/restaurants/" + id, data),
   delete:  (id)         => del("/restaurants/" + id),
+  addCategory:    (id, category) => request("POST",   "/restaurants/" + id + "/categories", { category }),
+  removeCategory: (id, category) => request("DELETE", "/restaurants/" + id + "/categories", { category }),
+  updateContact:  (id, phone, email) => request("PATCH", "/restaurants/" + id + "/contact",  { phone, email }),
+  updateLocation: (id, lng, lat)     => request("PATCH", "/restaurants/" + id + "/location",  { location: { type: "Point", coordinates: [lng, lat] } }),
 };
 
 
@@ -51,6 +55,9 @@ export const users = {
   create:  (data)     => post("/users", data),
   update:  (id, data) => put("/users/" + id, data),
   delete:  (id)       => del("/users/" + id),
+  addFavorite:          (userId, restaurantId) => request("POST",   "/users/" + userId + "/favorites",         { restaurant_id: restaurantId }),
+  removeFavorite:       (userId, restaurantId) => request("DELETE", "/users/" + userId + "/favorites",         { restaurant_id: restaurantId }),
+  updateDeliveryAddress:(userId, lng, lat)     => request("PATCH",  "/users/" + userId + "/delivery-address",  { delivery_address: { type: "Point", coordinates: [lng, lat] } }),
 
   // Login: match client-side (dev only) - TODO: replace with POST /auth/login once JWT added
   login: async (email, password) => {
@@ -100,6 +107,14 @@ export const reviews = {
   delete:          (id)           => del("/reviews/" + id),
 };
 
+
+// STATS
+// GET /stats => { active_restaurants, orders_by_status, unique_restaurant_categories, unique_menu_categories }
+// GET /restaurants/:id/menu-items/count => { restaurant_id, available_count }
+export const stats = {
+  getGlobal:          () => get("/stats"),
+  getMenuItemsCount:  (restaurantId) => get("/restaurants/" + restaurantId + "/menu-items/count"),
+};
 
 // FILES (GridFS)
 // POST /upload        - multipart/form-data, campo "file", devuelve { file_id, filename, size }

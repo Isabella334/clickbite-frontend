@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { helpers, users } from "../services/api";
+import { helpers, users, stats as statsApi } from "../services/api";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -10,24 +10,30 @@ export default function Login() {
     email: "",
     password: "",
     confirmPassword: "",
-    role: "customer",
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [siteStats, setSiteStats] = useState({ active_restaurants: "...", orders_by_status: {}, unique_restaurant_categories: [] });
+
+  useEffect(() => {
+    statsApi.getGlobal()
+      .then(data => setSiteStats(data))
+      .catch(() => {}); // fail silently
+  }, []);
 
   const roleRoutes = {
     customer:   "/restaurants",
     restaurant: "/restaurant-dashboard",
-    admin:      "/admin",
+    admin:      "/admin-dashboard",
   };
 
   const validate = () => {
     const e = {};
-    if (mode === "register" && !form.name.trim()) e.name = "El nombre es obligatorio";
-    if (!form.email.includes("@")) e.email = "Ingresa un correo válido";
-    if (form.password.length < 6) e.password = "Mínimo 6 caracteres";
+    if (mode === "register" && !form.name.trim()) e.name = "Name is required";
+    if (!form.email.includes("@")) e.email = "Enter a valid email";
+    if (form.password.length < 6) e.password = "At least 6 characters";
     if (mode === "register" && form.password !== form.confirmPassword)
-      e.confirmPassword = "Las contraseñas no coinciden";
+      e.confirmPassword = "Passwords don't match";
     return e;
   };
 
@@ -45,7 +51,7 @@ export default function Login() {
         const payload = helpers.toRegisterPayload(form);
         const created = await users.create(payload);
         helpers.saveSession(created);
-        navigate(roleRoutes[created.role] ?? "/restaurants");
+        navigate("/restaurants");
       }
     } catch (err) {
       setErrors({ submit: err.message });
@@ -59,514 +65,111 @@ export default function Login() {
     if (errors[field]) setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
   };
 
-  // Restaurants are created by admin — only customers can self-register
+  // Restaurants are created by admin - only customers can self-register
 
   return (
-    <>
+    <div style={{minHeight:"100vh",display:"flex",fontFamily:"'DM Sans',sans-serif",background:"#0f1117",color:"#e8eaf0"}}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap');
-
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        .cb-root {
-          min-height: 100vh;
-          display: flex;
-          font-family: 'DM Sans', sans-serif;
-          background: #0d1117;
-          overflow: hidden;
-        }
-
-        /* LEFT PANEL */
-        .cb-left {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          padding: 60px;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .cb-left::before {
-          content: '';
-          position: absolute;
-          width: 500px; height: 500px;
-          border-radius: 50%;
-          top: -100px; left: -100px;
-          pointer-events: none;
-        }
-
-        .cb-left::after {
-          content: '';
-          position: absolute;
-          width: 350px; height: 350px;
-          border-radius: 50%;
-          bottom: -50px; right: 40px;
-          pointer-events: none;
-        }
-
-        .cb-brand { margin-bottom: 56px; position: relative; z-index: 1; }
-
-        .cb-brand-logo {
-          font-family: 'Syne', sans-serif;
-          font-size: 2.4rem;
-          font-weight: 800;
-          color: #52c49b;
-          letter-spacing: -1px;
-          line-height: 1;
-        }
-
-        .cb-brand-logo span { color: #fff; }
-
-        .cb-brand-tagline {
-          margin-top: 8px;
-          font-size: 0.85rem;
-          color: rgba(255,255,255,0.4);
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          font-weight: 300;
-        }
-
-        .cb-hero-text { position: relative; z-index: 1; }
-
-        .cb-hero-text h2 {
-          font-family: 'Syne', sans-serif;
-          font-size: clamp(2rem, 3.5vw, 3rem);
-          font-weight: 700;
-          color: #fff;
-          line-height: 1.15;
-          margin-bottom: 20px;
-        }
-
-        .cb-hero-text h2 em { font-style: normal; color: #52c49b; }
-
-        .cb-hero-text p {
-          font-size: 1rem;
-          color: rgba(255,255,255,0.45);
-          line-height: 1.7;
-          max-width: 340px;
-          font-weight: 300;
-        }
-
-        .cb-stats { display: flex; gap: 40px; margin-top: 56px; position: relative; z-index: 1; }
-
-        .cb-stat-item strong {
-          display: block;
-          font-family: 'Syne', sans-serif;
-          font-size: 1.6rem;
-          font-weight: 800;
-          color: #52c49b;
-        }
-
-        .cb-stat-item span {
-          font-size: 0.78rem;
-          color: rgba(255,255,255,0.35);
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          font-weight: 300;
-        }
-
-        .cb-food-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 10px;
-          margin-top: 48px;
-          position: relative;
-          z-index: 1;
-          opacity: 0.6;
-        }
-
-        .cb-food-emoji {
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 12px;
-          padding: 14px;
-          text-align: center;
-          font-size: 1.5rem;
-          transition: all 0.2s;
-        }
-
-        .cb-food-emoji:hover {
-          background: rgba(82,196,155,0.1);
-          border-color: rgba(82,196,155,0.3);
-          transform: scale(1.05);
-        }
-
-        /* RIGHT PANEL */
-        .cb-right {
-          width: 480px;
-          min-width: 480px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          padding: 56px 48px;
-          background: #111820;
-          position: relative;
-          overflow-y: auto;
-        }
-
-        .cb-right::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 0;
-          width: 1px; height: 100%;
-          background: linear-gradient(to bottom, transparent, rgba(82,196,155,0.3) 30%, rgba(82,196,155,0.3) 70%, transparent);
-        }
-
-        /* MODE TOGGLE */
-        .cb-mode-toggle {
-          display: flex;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 10px;
-          padding: 4px;
-          margin-bottom: 36px;
-        }
-
-        .cb-mode-btn {
-          flex: 1;
-          padding: 10px;
-          border: none;
-          border-radius: 7px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.88rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s;
-          background: transparent;
-          color: rgba(255,255,255,0.4);
-        }
-
-        .cb-mode-btn.active {
-          background: #52c49b;
-          color: #0d1f1c;
-          font-weight: 600;
-        }
-
-        /* HEADING */
-        .cb-form-heading { margin-bottom: 28px; }
-
-        .cb-form-heading h1 {
-          font-family: 'Syne', sans-serif;
-          font-size: 1.75rem;
-          font-weight: 700;
-          color: #fff;
-          line-height: 1.2;
-        }
-
-        .cb-form-heading p {
-          margin-top: 6px;
-          font-size: 0.88rem;
-          color: rgba(255,255,255,0.4);
-          font-weight: 300;
-        }
-
-        /* ROLE CARDS */
-        .cb-role-label {
-          font-size: 0.78rem;
-          font-weight: 500;
-          color: rgba(255,255,255,0.4);
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          margin-bottom: 10px;
-        }
-
-        .cb-role-cards {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 8px;
-          margin-bottom: 20px;
-        }
-
-        .cb-role-card {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 6px;
-          padding: 14px 8px;
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 10px;
-          cursor: pointer;
-          transition: all 0.18s;
-          font-family: 'DM Sans', sans-serif;
-        }
-
-        .cb-role-card:hover {
-          border-color: rgba(82,196,155,0.3);
-          background: rgba(82,196,155,0.05);
-        }
-
-        .cb-role-card.active {
-          border-color: #52c49b;
-          background: rgba(82,196,155,0.1);
-        }
-
-        .cb-role-card-icon { font-size: 1.4rem; }
-
-        .cb-role-card-name {
-          font-size: 0.78rem;
-          font-weight: 500;
-          color: rgba(255,255,255,0.5);
-        }
-
-        .cb-role-card.active .cb-role-card-name { color: #52c49b; font-weight: 600; }
-
-        /* ROLE CARDS — solo registro */
-        /* role styles removed — customers only */
-          font-size: 0.78rem;
-          font-weight: 500;
-          color: rgba(255,255,255,0.4);
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          margin-bottom: 10px;
-        }
-
-        /* FIELDS */
-        .cb-field { margin-bottom: 16px; }
-
-        .cb-field label {
-          display: block;
-          font-size: 0.8rem;
-          font-weight: 500;
-          color: rgba(255,255,255,0.5);
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          margin-bottom: 7px;
-        }
-
-        .cb-field input {
-          width: 100%;
-          padding: 13px 16px;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 9px;
-          color: #fff;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.95rem;
-          outline: none;
-          transition: all 0.2s;
-        }
-
-        .cb-field input::placeholder { color: rgba(255,255,255,0.2); }
-
-        .cb-field input:focus {
-          border-color: #52c49b;
-          background: rgba(82,196,155,0.05);
-          box-shadow: 0 0 0 3px rgba(82,196,155,0.1);
-        }
-
-        .cb-field input.error { border-color: #e05c5c; background: rgba(224,92,92,0.05); }
-
-        .cb-error-msg { margin-top: 5px; font-size: 0.78rem; color: #e05c5c; }
-
-        /* SUBMIT */
-        .cb-submit {
-          width: 100%;
-          padding: 15px;
-          background: #52c49b;
-          border: none;
-          border-radius: 10px;
-          color: #0d1f1c;
-          font-family: 'Syne', sans-serif;
-          font-size: 1rem;
-          font-weight: 700;
-          cursor: pointer;
-          margin-top: 8px;
-          transition: all 0.2s;
-          letter-spacing: 0.02em;
-        }
-
-        .cb-submit:hover:not(:disabled) {
-          background: #63d4ab;
-          transform: translateY(-1px);
-          box-shadow: 0 8px 24px rgba(82,196,155,0.3);
-        }
-
-        .cb-submit:active:not(:disabled) { transform: translateY(0); }
-        .cb-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .cb-spinner {
-          display: inline-block;
-          width: 16px; height: 16px;
-          border: 2px solid rgba(13,31,28,0.3);
-          border-top-color: #0d1f1c;
-          border-radius: 50%;
-          animation: spin 0.6s linear infinite;
-          vertical-align: middle;
-          margin-right: 8px;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .cb-demo-hint {
-          margin-top: 20px;
-          padding: 12px 14px;
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 8px;
-          font-size: 0.76rem;
-          color: rgba(255,255,255,0.25);
-          line-height: 1.5;
-        }
-
-        .cb-demo-hint strong { color: rgba(82,196,155,0.6); }
-
-        .cb-form-area { animation: slideUp 0.35s ease; }
-
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(12px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        @media (max-width: 820px) {
-          .cb-root { flex-direction: column; }
-          .cb-left { padding: 40px 32px 32px; }
-          .cb-left .cb-stats, .cb-left .cb-food-grid { display: none; }
-          .cb-right { width: 100%; min-width: unset; padding: 32px 24px 48px; }
-          .cb-right::before { display: none; }
-        }
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap');
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{background:#0f1117}
+        .lg-wrap{display:flex;min-height:100vh;width:100%}
+        .lg-left{flex:1;padding:64px;display:flex;flex-direction:column;justify-content:space-between;border-right:1px solid #1e2230}
+        .lg-right{width:420px;padding:64px 48px;display:flex;flex-direction:column;justify-content:center}
+        .lg-logo{font-family:'DM Mono',monospace;font-size:1.1rem;font-weight:500;color:#52c49b;letter-spacing:0.05em}
+        .lg-logo span{color:#e8eaf0}
+        .lg-tagline{font-size:0.72rem;color:#3d4255;text-transform:uppercase;letter-spacing:0.12em;margin-top:4px}
+        .lg-hero h1{font-size:clamp(2.2rem,4vw,3.2rem);font-weight:300;color:#e8eaf0;line-height:1.2;margin-bottom:16px}
+        .lg-hero h1 em{font-style:normal;color:#52c49b}
+        .lg-hero p{font-size:0.9rem;color:#4a5068;line-height:1.7;max-width:340px}
+        .lg-stats{display:flex;gap:40px;padding-top:40px;border-top:1px solid #1e2230;margin-top:auto}
+        .lg-stat strong{display:block;font-family:'DM Mono',monospace;font-size:1.5rem;font-weight:500;color:#52c49b}
+        .lg-stat span{font-size:0.7rem;color:#3d4255;text-transform:uppercase;letter-spacing:0.1em;margin-top:2px;display:block}
+        .lg-toggle{display:flex;background:#1a1e2e;border:1px solid #1e2230;border-radius:6px;padding:3px;margin-bottom:32px}
+        .lg-tab{flex:1;padding:9px;border:none;border-radius:4px;background:transparent;color:#4a5068;font-family:'DM Sans',sans-serif;font-size:0.85rem;cursor:pointer}
+        .lg-tab.active{background:#52c49b;color:#0a0e14;font-weight:600}
+        .lg-label{display:block;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:#3d4255;margin-bottom:6px;margin-top:16px}
+        .lg-input{width:100%;padding:11px 14px;background:#1a1e2e;border:1px solid #1e2230;border-radius:6px;color:#e8eaf0;font-family:'DM Sans',sans-serif;font-size:0.9rem;outline:none}
+        .lg-input:focus{border-color:#52c49b}
+        .lg-input.err{border-color:#e05555}
+        .lg-error{font-size:0.75rem;color:#e05555;margin-top:4px}
+        .lg-submit{width:100%;margin-top:24px;padding:12px;background:#52c49b;border:none;border-radius:6px;color:#0a0e14;font-family:'DM Sans',sans-serif;font-size:0.9rem;font-weight:600;cursor:pointer;letter-spacing:0.02em}
+        .lg-submit:hover{background:#60d4a8}
+        .lg-submit:disabled{opacity:0.5;cursor:not-allowed}
+        .lg-hint{margin-top:16px;padding:10px 12px;background:#1a1e2e;border-left:2px solid #52c49b33;font-size:0.75rem;color:#3d4255;line-height:1.5}
+        .lg-hint strong{color:#52c49b88}
+        @media(max-width:760px){.lg-left{display:none}.lg-right{width:100%;padding:40px 24px}}
       `}</style>
 
-      <div className="cb-root">
-        {/* LEFT PANEL */}
-        <div className="cb-left">
-          <div className="cb-brand">
-            <div className="cb-brand-logo">Click<span>Bite</span></div>
-            <div className="cb-brand-tagline">Comida a domicilio, reinventada</div>
+      <div className="lg-wrap">
+        {/* LEFT */}
+        <div className="lg-left">
+          <div>
+            <div className="lg-logo">Click<span>Bite</span></div>
+            <div className="lg-tagline">Food delivery platform</div>
           </div>
-
-          <div className="cb-hero-text">
-            <h2>
-              Tu comida<br />
-              favorita, <em>entregada</em><br />
-              al instante.
-            </h2>
-            <p>
-              Descubre cientos de restaurantes cerca de ti y recibe comida fresca directamente a tu puerta.
-            </p>
+          <div className="lg-hero">
+            <h1>Your favorite<br/>food, <em>delivered</em><br/>instantly.</h1>
+            <p>Discover restaurants near you and get fresh meals delivered right to your door.</p>
+          </div>
+          <div className="lg-stats">
+            <div className="lg-stat">
+              <strong>{siteStats.active_restaurants ?? "-"}</strong>
+              <span>Active restaurants</span>
+            </div>
+            <div className="lg-stat">
+              <strong>{siteStats.orders_by_status?.delivered ?? "-"}</strong>
+              <span>Delivered orders</span>
+            </div>
+            <div className="lg-stat">
+              <strong>{(siteStats.unique_restaurant_categories ?? []).length || "-"}</strong>
+              <span>Cuisines</span>
+            </div>
           </div>
         </div>
 
-        {/* RIGHT PANEL */}
-        <div className="cb-right">
-          <div className="cb-mode-toggle">
-            <button
-              className={"cb-mode-btn" + (mode === "login" ? " active" : "")}
-              onClick={() => { setMode("login"); setErrors({}); }}
-            >
-              Iniciar sesión
-            </button>
-            <button
-              className={"cb-mode-btn" + (mode === "register" ? " active" : "")}
-              onClick={() => { setMode("register"); setErrors({}); }}
-            >
-              Crear cuenta
-            </button>
+        {/* RIGHT */}
+        <div className="lg-right">
+          <div className="lg-toggle">
+            <button className={"lg-tab"+(mode==="login"?" active":"")} onClick={()=>{setMode("login");setErrors({})}}>Sign in</button>
+            <button className={"lg-tab"+(mode==="register"?" active":"")} onClick={()=>{setMode("register");setErrors({})}}>Create account</button>
           </div>
 
-          <div className="cb-form-area" key={mode}>
-            <div className="cb-form-heading">
-              <h1>{mode === "login" ? "Bienvenido de nuevo" : "Únete a ClickBite"}</h1>
-              <p>
-                {mode === "login"
-                  ? "Ingresa tus credenciales para continuar"
-                  : "Crea tu cuenta para empezar"}
-              </p>
-            </div>
+          {mode==="register" && (
+            <>
+              <label className="lg-label">Full name</label>
+              <input className={"lg-input"+(errors.name?" err":"")} type="text" placeholder="Jane Smith" value={form.name} onChange={e=>handleChange("name",e.target.value)}/>
+              {errors.name && <div className="lg-error">{errors.name}</div>}
+            </>
+          )}
 
-            {/* Restaurants are created by admin — register is customer only */}
+          <label className="lg-label">Email</label>
+          <input className={"lg-input"+(errors.email?" err":"")} type="email" placeholder="you@example.com" value={form.email} onChange={e=>handleChange("email",e.target.value)}/>
+          {errors.email && <div className="lg-error">{errors.email}</div>}
 
-            {mode === "register" && (
-              <div style={{ marginBottom: 20 }}>
-                <div className="cb-role-label">Tipo de cuenta</div>
-                <div className="cb-role-cards">
-                  {[
-                    { value: "customer",   icon: "🧑",  label: "Cliente"      },
-                    { value: "restaurant", icon: "🍽️",  label: "Restaurante"  },
-                    { value: "admin",      icon: "🛡️",  label: "Admin"        },
-                  ].map(r => (
-                    <button
-                      key={r.value}
-                      type="button"
-                      className={"cb-role-card" + (form.role === r.value ? " active" : "")}
-                      onClick={() => handleChange("role", r.value)}
-                    >
-                      <span className="cb-role-card-icon">{r.icon}</span>
-                      <span className="cb-role-card-name">{r.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+          <label className="lg-label">Password</label>
+          <input className={"lg-input"+(errors.password?" err":"")} type="password" placeholder="min. 6 characters" value={form.password} onChange={e=>handleChange("password",e.target.value)}/>
+          {errors.password && <div className="lg-error">{errors.password}</div>}
 
-            {mode === "register" && (
-              <div className="cb-field">
-                <label>Nombre completo</label>
-                <input
-                  type="text"
-                  placeholder="Juan García"
-                  className={errors.name ? "error" : ""}
-                  value={form.name}
-                  onChange={e => handleChange("name", e.target.value)}
-                />
-                {errors.name && <div className="cb-error-msg">{errors.name}</div>}
-              </div>
-            )}
+          {mode==="register" && (
+            <>
+              <label className="lg-label">Confirm password</label>
+              <input className={"lg-input"+(errors.confirmPassword?" err":"")} type="password" placeholder="repeat password" value={form.confirmPassword} onChange={e=>handleChange("confirmPassword",e.target.value)}/>
+              {errors.confirmPassword && <div className="lg-error">{errors.confirmPassword}</div>}
+            </>
+          )}
 
-            <div className="cb-field">
-              <label>Correo electrónico</label>
-              <input
-                type="email"
-                placeholder="tú@ejemplo.com"
-                className={errors.email ? "error" : ""}
-                value={form.email}
-                onChange={e => handleChange("email", e.target.value)}
-              />
-              {errors.email && <div className="cb-error-msg">{errors.email}</div>}
-            </div>
+          <button className="lg-submit" onClick={handleSubmit} disabled={loading}>
+            {loading ? "Loading..." : mode==="login" ? "Sign in" : "Create account"}
+          </button>
 
-            <div className="cb-field">
-              <label>Contraseña</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                className={errors.password ? "error" : ""}
-                value={form.password}
-                onChange={e => handleChange("password", e.target.value)}
-              />
-              {errors.password && <div className="cb-error-msg">{errors.password}</div>}
-            </div>
+          {errors.submit && <div className="lg-error" style={{marginTop:10,textAlign:"center"}}>{errors.submit}</div>}
 
-            {mode === "register" && (
-              <div className="cb-field">
-                <label>Confirmar contraseña</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  className={errors.confirmPassword ? "error" : ""}
-                  value={form.confirmPassword}
-                  onChange={e => handleChange("confirmPassword", e.target.value)}
-                />
-                {errors.confirmPassword && (
-                  <div className="cb-error-msg">{errors.confirmPassword}</div>
-                )}
-              </div>
-            )}
-
-            <button className="cb-submit" onClick={handleSubmit} disabled={loading}>
-              {loading && <span className="cb-spinner" />}
-              {loading ? "Por favor espera…" : mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
-            </button>
-
-            {errors.submit && (
-              <div className="cb-error-msg" style={{ marginTop: 12, textAlign: "center", fontSize: "0.85rem" }}>
-                ⚠️ {errors.submit}
-              </div>
-            )}
+          <div className="lg-hint">
+            <strong>Demo:</strong> admin@clickbite.com / admin123 &nbsp;|&nbsp; user1@example.com / pass123
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
