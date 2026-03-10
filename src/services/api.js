@@ -120,7 +120,7 @@ export const orders = {
 // Note: no order_id, no tags[] in backend model
 // ─────────────────────────────────────────────────────────────────────────────
 export const reviews = {
-  getAll:         ()             => get("/reviews"),
+  getAll:      ()             => get("/reviews"),
   getById:        (id)           => get(`/reviews/${id}`),
   getByRestaurant:(restaurantId) => get(`/reviews/restaurant/${restaurantId}`),
   // body: { user_id, restaurant_id, rating, comment }
@@ -192,11 +192,11 @@ export const helpers = {
 
   // ── Register payload ──────────────────────────────────────────────────────
   // Used in Login.jsx register form → POST /users
-  toRegisterPayload: ({ name, email, password }) => ({
+  toRegisterPayload: ({ name, email, password, role }) => ({
     name,
     email,
     password,
-    role:      "customer",
+    role:      role ?? "customer",
     is_active: true,
     delivery_address: { type: "Point", coordinates: [0, 0] },
     favorite_restaurants: [],

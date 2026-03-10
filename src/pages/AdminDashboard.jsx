@@ -1,115 +1,50 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { restaurants as restaurantsApi, users as usersApi, orders as ordersApi, analytics, helpers } from "../services/api";
 
 // ─────────────────────────────────────────────
-// MOCK DATA
+// STATIC CONFIG (no viene del backend)
 // ─────────────────────────────────────────────
-const mockStats = {
-  totalRevenue: 14820.50, totalOrders: 1043,
-  totalUsers: 512, totalRestaurants: 28,
-  ordersToday: 87, ingresosToday: 1240.75,
-  newUsersWeek: 34, activeRestaurants: 21,
-};
-
-const mockWeekData = [
-  { day: "Lun", ingresos: 1820, orders: 124 },
-  { day: "Mar", ingresos: 1540, orders: 108 },
-  { day: "Mié", ingresos: 2310, orders: 162 },
-  { day: "Jue", ingresos: 1980, orders: 140 },
-  { day: "Vie", ingresos: 2740, orders: 195 },
-  { day: "Sáb", ingresos: 3190, orders: 227 },
-  { day: "Dom", ingresos: 1240, orders:  87 },
-];
-
-const initialRestaurants = [
-  { id: 1, name: "Burger Palace", owner: "John D.",  category: "Burgers", orders: 320, rating: 4.8, status: "activo",   joined: "Dec 5, 2023",  image: "🍔", email: "bp@restaurant.com",   phone: "555-0101", menuItems: 12 },
-  { id: 2, name: "Sushi Zen",     owner: "Kenji T.", category: "Sushi",   orders: 210, rating: 4.9, status: "activo",   joined: "Nov 20, 2023", image: "🍣", email: "zen@restaurant.com",  phone: "555-0102", menuItems: 18 },
-  { id: 3, name: "Pizza Mondo",   owner: "Marco R.", category: "Pizza",   orders: 89,  rating: 4.2, status: "inactivo", joined: "Jan 8, 2024",  image: "🍕", email: "pizza@restaurant.com",phone: "555-0103", menuItems: 9  },
-  { id: 4, name: "Taco Fiesta",   owner: "Rosa M.",  category: "Mexican", orders: 178, rating: 4.5, status: "activo",   joined: "Oct 14, 2023", image: "🌮", email: "tacos@restaurant.com",phone: "555-0104", menuItems: 14 },
-];
-
-// ── Pipeline 4: Historial resumido por usuario
-// GET /api/admin/analytics/user-order-summary
-// db.orders.aggregate([ {$group:{_id:"$user_id", totalOrders:{$sum:1}, totalSpent:{$sum:"$total"}}} ])
-const initialUsers = [
-  { id: 1, name: "María García",     email: "maria@email.com",      role: "customer",   status: "activo",    joined: "Jan 12, 2024", orders: 18, totalSpent: 284.50 },
-  { id: 2, name: "Carlos Rodríguez", email: "carlos@email.com",     role: "customer",   status: "activo",    joined: "Feb 3, 2024",  orders: 7,  totalSpent: 98.75  },
-  { id: 3, name: "Ana López",        email: "ana@email.com",        role: "customer",   status: "suspendido", joined: "Mar 1, 2024",  orders: 2,  totalSpent: 31.98  },
-  { id: 4, name: "Burger Palace",    email: "bp@restaurant.com",    role: "restaurant", status: "activo",    joined: "Dec 5, 2023",  orders: 320,totalSpent: null   },
-  { id: 5, name: "Sushi Zen",        email: "zen@restaurant.com",   role: "restaurant", status: "activo",    joined: "Nov 20, 2023", orders: 210,totalSpent: null   },
-  { id: 6, name: "Luis Méndez",      email: "luis@email.com",       role: "customer",   status: "activo",    joined: "Feb 18, 2024", orders: 5,  totalSpent: 67.45  },
-];
-
-const mockOrders = [
-  { id: "ORD-0042", customer: "María G.",   restaurant: "Burger Palace", total: 25.97, status: "delivered",  date: "Today, 3:12 PM" },
-  { id: "ORD-0041", customer: "Carlos R.",  restaurant: "Sushi Zen",     total: 38.48, status: "on_the_way", date: "Today, 3:06 PM" },
-  { id: "ORD-0040", customer: "Ana L.",     restaurant: "Pizza Mondo",   total: 16.98, status: "preparing",  date: "Today, 2:59 PM" },
-  { id: "ORD-0039", customer: "Luis M.",    restaurant: "Taco Fiesta",   total: 12.98, status: "delivered",  date: "Today, 2:42 PM" },
-  { id: "ORD-0038", customer: "Sofía P.",   restaurant: "Burger Palace", total: 30.96, status: "delivered",  date: "Today, 2:29 PM" },
-  { id: "ORD-0037", customer: "Diego F.",   restaurant: "Sushi Zen",     total: 44.97, status: "cancelled",  date: "Today, 2:15 PM" },
-];
-
-// ── Pipeline 1: Restaurantes mejor calificados
-// GET /api/admin/analytics/top-rated-restaurants
-// db.reseñas.aggregate([ {$group:{_id:"$restaurant_id", avgRating:{$avg:"$rating"}, totalReviews:{$sum:1}}},
-//   {$lookup:{from:"restaurants",localField:"_id",foreignField:"_id",as:"restaurant"}},
-//   {$sort:{avgRating:-1}}, {$limit:5} ])
-const mockTopRated = [
-  { id: 2, name: "Sushi Zen",    image: "🍣", avgRating: 4.9, totalReviews: 184 },
-  { id: 1, name: "Burger Palace",image: "🍔", avgRating: 4.8, totalReviews: 320 },
-  { id: 6, name: "Noodle House", image: "🍜", avgRating: 4.7, totalReviews: 97  },
-  { id: 4, name: "Taco Fiesta",  image: "🌮", avgRating: 4.5, totalReviews: 142 },
-  { id: 5, name: "Green Bowl",   image: "🥗", avgRating: 4.4, totalReviews: 73  },
-];
-
-// ── Pipeline 3: Total de ventas por restaurante (solo órdenes delivered)
-// GET /api/admin/analytics/ingresos-by-restaurant
-// db.orders.aggregate([ {$match:{status:"delivered"}},
-//   {$group:{_id:"$restaurant_id", totalRevenue:{$sum:"$total"}, totalOrders:{$sum:1}}},
-//   {$sort:{totalRevenue:-1}} ])
-const mockRevenueByRestaurant = [
-  { id: 1, name: "Burger Palace", image: "🍔", totalRevenue: 4820.50, totalOrders: 320 },
-  { id: 2, name: "Sushi Zen",     image: "🍣", totalRevenue: 3940.20, totalOrders: 210 },
-  { id: 4, name: "Taco Fiesta",   image: "🌮", totalRevenue: 2615.80, totalOrders: 178 },
-  { id: 6, name: "Noodle House",  image: "🍜", totalRevenue: 1988.40, totalOrders: 143 },
-  { id: 5, name: "Green Bowl",    image: "🥗", totalRevenue: 1240.10, totalOrders: 95  },
-  { id: 3, name: "Pizza Mondo",   image: "🍕", totalRevenue:  980.75, totalOrders: 89  },
-];
-
 const CATEGORIES   = ["Burgers", "Pizza", "Sushi", "Mexican", "Asian", "Healthy", "Chicken", "Italian", "Indian"];
 const MENU_CATS    = ["Entradas", "Platos principales", "Acompañamientos", "Bebidas", "Postres"];
 const EMOJI_OPTS   = ["🍔","🍕","🍣","🌮","🍜","🥗","🍗","🍝","🍛","🥤","🍟","🧅","🍫","🥧","🍋","🌶️","🥩","🍄","🫔","🍱"];
 const TABS         = ["Resumen", "Restaurantes", "Usuarios", "Pedidos"];
 
 const STATUS_CONFIG = {
-  pending:    { label: "Pendiente",    color: "#94a3b8", bg: "rgba(148,163,184,0.12)", icon: "🕐" },
-  confirmed:  { label: "Confirmado",  color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  icon: "✅" },
-  preparing:  { label: "Preparando",  color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  icon: "👨‍🍳" },
-  on_the_way: { label: "En camino", color: "#a78bfa", bg: "rgba(167,139,250,0.12)", icon: "🛵" },
+  pending:    { label: "Pendiente",  color: "#94a3b8", bg: "rgba(148,163,184,0.12)", icon: "🕐" },
+  confirmed:  { label: "Confirmado", color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  icon: "✅" },
+  preparing:  { label: "Preparando", color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  icon: "👨‍🍳" },
+  on_the_way: { label: "En camino",  color: "#a78bfa", bg: "rgba(167,139,250,0.12)", icon: "🛵" },
   delivered:  { label: "Entregado",  color: "#52c49b", bg: "rgba(82,196,155,0.12)",  icon: "✓"  },
   cancelled:  { label: "Cancelado",  color: "#e05c5c", bg: "rgba(224,92,92,0.12)",   icon: "✕"  },
 };
 
-const EMPTY_REST = { name: "", email: "", phone: "", category: "Burgers", image: "🍔", ownerName: "", ownerEmail: "", ownerPassword: "" };
+const EMPTY_REST      = { name: "", email: "", phone: "", category: "Burgers", image: "🍔", ownerName: "", ownerEmail: "", ownerPassword: "" };
 const EMPTY_MENU_ITEM = { name: "", description: "", price: "", category: "Platos principales", image: "🍔", popular: false };
-const EMPTY_USER = { name: "", email: "", password: "", role: "customer" };
-
-// ── Wizard steps for restaurant creation ──
-const WIZARD_STEPS = ["Info del restaurante", "Cuenta del dueño", "Menú inicial", "Revisar"];
+const EMPTY_USER      = { name: "", email: "", password: "", role: "customer" };
+const WIZARD_STEPS    = ["Info del restaurante", "Cuenta del dueño", "Menú inicial", "Revisar"];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
   const [activeTab,      setActiveTab]      = useState("Resumen");
-  const [restaurants,    setRestaurants]    = useState(initialRestaurants);
-  const [users,          setUsers]          = useState(initialUsers);
+
+  // ── Data from backend ──
+  const [restaurants,    setRestaurants]    = useState([]);
+  const [users,          setUsers]          = useState([]);
+  const [orders,         setOrders]         = useState([]);
+  const [topRated,       setTopRated]       = useState([]);
+  const [salesByRest,    setSalesByRest]    = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState("");
+
   const [search,         setSearch]         = useState("");
-  const [restFilter,     setRestFilter]     = useState("All");
-  const [userFilter,     setUserFilter]     = useState("All");
-  const [orderFilter,    setOrderFilter]    = useState("All");
-  const [chartMetric,    setChartMetric]    = useState("ingresos");
+  const [restFilter,     setRestFilter]     = useState("Todos");
+  const [userFilter,     setUserFilter]     = useState("Todos");
+  const [orderFilter,    setOrderFilter]    = useState("Todos");
+  const [chartMetric,    setChartMetric]    = useState("revenue");
   const [topRatedLimit,  setTopRatedLimit]  = useState(5);
-  const [ingresosLimit,   setRevenueLimit]   = useState(6);
+  const [revenueLimit,   setRevenueLimit]   = useState(6);
   const [toast,          setToast]          = useState("");
 
   // ── Restaurant wizard ──
@@ -132,6 +67,87 @@ export default function AdminDashboard() {
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
+  // ── Fetch all data on mount ──
+  useEffect(() => {
+    const fetchAll = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const [restsRaw, usersRaw, ordersRaw, topRatedRaw, salesRaw] = await Promise.all([
+          restaurantsApi.getAll(),
+          usersApi.getAll(),
+          ordersApi.getAll(),
+          analytics.getTopRatedRestaurants(),
+          analytics.getSalesByRestaurant(),
+        ]);
+
+        // ── Map restaurants ──
+        setRestaurants((restsRaw ?? []).map(r => ({
+          id:        r.id,
+          name:      r.name,
+          email:     r.contact?.email ?? "—",
+          phone:     r.contact?.phone ?? "—",
+          category:  r.categories?.[0] ?? "—",
+          image:     "🍽️",
+          rating:    r.avg_rating ?? 0,
+          orders:    0, // no orders count in restaurant model
+          status:    r.is_active ? "activo" : "inactivo",
+          joined:    new Date(r.created_at).toLocaleDateString("es-GT"),
+          menuItems: 0,
+          owner:     "—",
+        })));
+
+        // ── Map users ──
+        setUsers((usersRaw ?? []).map(u => ({
+          id:         u.id,
+          name:       u.name,
+          email:      u.email,
+          role:       u.role,
+          status:     u.is_active ? "activo" : "suspendido",
+          joined:     new Date(u.created_at).toLocaleDateString("es-GT"),
+          orders:     0,
+          totalSpent: null,
+        })));
+
+        // ── Map orders ──
+        setOrders((ordersRaw ?? []).map(o => ({
+          id:         o.id,
+          customer:   o.user_id,
+          restaurant: o.restaurant_id,
+          total:      o.total ?? 0,
+          status:     o.status,
+          date:       new Date(o.created_at).toLocaleString("es-GT"),
+        })));
+
+        // ── Map top rated (Pipeline 1) ──
+        // Response: [{ restaurant_id, restaurant_name, avg_rating, total_reviews }]
+        setTopRated((topRatedRaw ?? []).map(r => ({
+          id:           r.restaurant_id ?? r._id,
+          name:         r.restaurant_name ?? r.name ?? "—",
+          image:        "🍽️",
+          avgRating:    r.avg_rating ?? 0,
+          totalReviews: r.total_reviews ?? 0,
+        })));
+
+        // ── Map sales by restaurant (Pipeline 3) ──
+        // Response: [{ restaurant_id, restaurant_name, total_revenue, total_orders }]
+        setSalesByRest((salesRaw ?? []).map(r => ({
+          id:           r.restaurant_id ?? r._id,
+          name:         r.restaurant_name ?? r.name ?? "—",
+          image:        "🍽️",
+          totalRevenue: r.total_revenue ?? 0,
+          totalOrders:  r.total_orders  ?? 0,
+        })));
+
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAll();
+  }, []);
+
   // ════════════════════════════════
   // RESTAURANT WIZARD
   // ════════════════════════════════
@@ -145,15 +161,15 @@ export default function AdminDashboard() {
   const validateStep = (step) => {
     const e = {};
     if (step === 0) {
-      if (!restForm.name.trim())     e.name     = "Obligatorio";
-      if (!restForm.email.includes("@")) e.email = "Correo inválido";
-      if (!restForm.phone.trim())    e.phone    = "Obligatorio";
-      if (!restForm.category)        e.category = "Obligatorio";
+      if (!restForm.name.trim())            e.name     = "Obligatorio";
+      if (!restForm.email.includes("@"))    e.email    = "Correo inválido";
+      if (!restForm.phone.trim())           e.phone    = "Obligatorio";
+      if (!restForm.category)              e.category = "Obligatorio";
     }
     if (step === 1) {
-      if (!restForm.ownerName.trim())  e.ownerName  = "Obligatorio";
+      if (!restForm.ownerName.trim())       e.ownerName    = "Obligatorio";
       if (!restForm.ownerEmail.includes("@")) e.ownerEmail = "Correo inválido";
-      if (restForm.ownerPassword.length < 6) e.ownerPassword = "Mínimo 6 caracteres";
+      if (restForm.ownerPassword.length < 6)  e.ownerPassword = "Mínimo 6 caracteres";
     }
     return e;
   };
@@ -172,8 +188,8 @@ export default function AdminDashboard() {
   // Add menu item to draft
   const addMenuItem = () => {
     const e = {};
-    if (!menuForm.name.trim()) e.name = "Obligatorio";
-    if (!menuForm.price || isNaN(parseFloat(menuForm.price)) || parseFloat(menuForm.price) <= 0) e.price = "Valor inválido";
+    if (!menuForm.name.trim()) e.name = "Required";
+    if (!menuForm.price || isNaN(parseFloat(menuForm.price)) || parseFloat(menuForm.price) <= 0) e.price = "Invalid";
     if (Object.keys(e).length) { setRestErrors(e); return; }
     setMenuItems(prev => [...prev, { ...menuForm, id: Date.now(), price: parseFloat(menuForm.price) }]);
     setMenuForm(EMPTY_MENU_ITEM);
@@ -192,48 +208,92 @@ export default function AdminDashboard() {
     if (restErrors[field]) setRestErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
   };
 
-  // Final save
-  const saveRestaurant = () => {
+  // Final save — POST /restaurants + POST /users (owner)
+  const saveRestaurant = async () => {
     setSaving(true);
-    setTimeout(() => {
-      // POST /api/admin/restaurants  +  POST /api/admin/restaurants/:id/menu
-      const newRest = {
-        id: Date.now(), name: restForm.name, owner: restForm.ownerName,
-        category: restForm.category, orders: 0, rating: 0,
-        status: "activo", joined: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-        image: restForm.image, email: restForm.email, phone: restForm.phone,
+    try {
+      const restPayload = helpers.toCreateRestaurantPayload({
+        name:        restForm.name,
+        description: "",
+        categories:  [restForm.category],
+        phone:       restForm.phone,
+        email:       restForm.email,
+      });
+      const created = await restaurantsApi.create(restPayload);
+
+      // Create owner user account
+      const ownerPayload = helpers.toCreateOwnerPayload({
+        ownerName:     restForm.ownerName,
+        ownerEmail:    restForm.ownerEmail,
+        ownerPassword: restForm.ownerPassword,
+      });
+      const ownerCreated = await usersApi.create(ownerPayload);
+
+      setRestaurants(prev => [{
+        id:        created.id,
+        name:      created.name,
+        email:     restForm.email,
+        phone:     restForm.phone,
+        category:  restForm.category,
+        image:     restForm.image,
+        rating:    0,
+        orders:    0,
+        status:    "activo",
+        joined:    new Date(created.created_at).toLocaleDateString("es-GT"),
         menuItems: menuItems.length,
-      };
-      setRestaurants(prev => [newRest, ...prev]);
-      // Also add owner as user
-      setUsers(prev => [{
-        id: Date.now() + 1, name: restForm.ownerName, email: restForm.ownerEmail,
-        role: "restaurant", status: "activo",
-        joined: newRest.joined, orders: 0,
+        owner:     restForm.ownerName,
       }, ...prev]);
-      setSaving(false);
+
+      setUsers(prev => [{
+        id:         ownerCreated.id,
+        name:       ownerCreated.name,
+        email:      ownerCreated.email,
+        role:       "restaurant",
+        status:     "activo",
+        joined:     new Date(ownerCreated.created_at).toLocaleDateString("es-GT"),
+        orders:     0,
+        totalSpent: null,
+      }, ...prev]);
+
       closeRestModal();
-      showToast("Restaurant \"" + restForm.name + "\" creado con " + menuItems.length + " productos en el menú");
-    }, 1200);
+      showToast("Restaurante \"" + restForm.name + "\" creado con " + menuItems.length + " productos");
+    } catch (err) {
+      showToast("Error: " + err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // Toggle restaurant
-  const toggleRestStatus = (id) => {
-    setRestaurants(prev => prev.map(r => {
-      if (r.id !== id) return r;
-      const next = r.status === "activo" ? "inactivo" : "activo";
-      showToast(next === "activo" ? "Restaurante activado" : "Restaurante desactivado");
-      return { ...r, status: next };
-    }));
+  // Toggle restaurant active status — PUT /restaurants/:id
+  const toggleRestStatus = async (id) => {
+    const r = restaurants.find(x => x.id === id);
+    if (!r) return;
+    const nextActive = r.status !== "activo";
+    try {
+      await restaurantsApi.update(id, { is_active: nextActive });
+      setRestaurants(prev => prev.map(x =>
+        x.id === id ? { ...x, status: nextActive ? "activo" : "inactivo" } : x
+      ));
+      showToast(nextActive ? "Restaurante activado" : "Restaurante desactivado");
+    } catch (err) {
+      showToast("Error: " + err.message);
+    }
   };
 
   const confirmDeleteRest = (id) => setDeleteRestId(id);
 
-  const handleDeleteRest = () => {
+  // DELETE /restaurants/:id
+  const handleDeleteRest = async () => {
     const name = restaurants.find(r => r.id === deleteRestId)?.name;
-    setRestaurants(prev => prev.filter(r => r.id !== deleteRestId));
-    setDeleteRestId(null);
-    showToast("\"" + name + "\" has been removed");
+    try {
+      await restaurantsApi.delete(deleteRestId);
+      setRestaurants(prev => prev.filter(r => r.id !== deleteRestId));
+      showToast("\"" + name + "\" eliminado");
+    } catch (err) {
+      showToast("Error: " + err.message);
+    } finally {
+      setDeleteRestId(null);
+    }
   };
 
   // ════════════════════════════════
@@ -244,40 +304,63 @@ export default function AdminDashboard() {
 
   const validateUser = () => {
     const e = {};
-    if (!userForm.name.trim())              e.name     = "Obligatorio";
-    if (!userForm.email.includes("@"))      e.email    = "Correo inválido";
-    if (userForm.password.length < 6)       e.password = "Mínimo 6 caracteres";
+    if (!userForm.name.trim())           e.name     = "Obligatorio";
+    if (!userForm.email.includes("@"))   e.email    = "Correo inválido";
+    if (userForm.password.length < 6)    e.password = "Mínimo 6 caracteres";
     return e;
   };
 
-  const saveUser = () => {
+  // POST /users
+  const saveUser = async () => {
     const e = validateUser();
     if (Object.keys(e).length) { setUserErrors(e); return; }
     setSavingUser(true);
-    setTimeout(() => {
-      // POST /api/admin/users
+    try {
+      const payload = helpers.toRegisterPayload(userForm);
+      const created = await usersApi.create(payload);
       setUsers(prev => [{
-        id: Date.now(), name: userForm.name, email: userForm.email,
-        role: userForm.role, status: "activo",
-        joined: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-        orders: 0,
+        id:         created.id,
+        name:       created.name,
+        email:      created.email,
+        role:       created.role,
+        status:     "activo",
+        joined:     new Date(created.created_at).toLocaleDateString("es-GT"),
+        orders:     0,
+        totalSpent: null,
       }, ...prev]);
-      setSavingUser(false);
       closeUserModal();
-      showToast("User \"" + userForm.name + "\" creado exitosamente");
-    }, 800);
+      showToast("Usuario \"" + created.name + "\" creado exitosamente");
+    } catch (err) {
+      setUserErrors({ submit: err.message });
+    } finally {
+      setSavingUser(false);
+    }
   };
 
-  const toggleUserStatus = (id) => {
-    setUsers(prev => prev.map(u => {
-      if (u.id !== id) return u;
-      const next = u.status === "activo" ? "suspendido" : "activo";
-      showToast(next === "activo" ? "Usuario reactivado" : "Usuario suspendido");
-      return { ...u, status: next };
-    }));
+  // PUT /users/:id  (toggle is_active)
+  const toggleUserStatus = async (id) => {
+    const u = users.find(x => x.id === id);
+    if (!u) return;
+    const nextActive = u.status !== "activo";
+    try {
+      await usersApi.update(id, { is_active: nextActive });
+      setUsers(prev => prev.map(x =>
+        x.id === id ? { ...x, status: nextActive ? "activo" : "suspendido" } : x
+      ));
+      showToast(nextActive ? "Usuario reactivado" : "Usuario suspendido");
+    } catch (err) {
+      showToast("Error: " + err.message);
+    }
   };
 
   // ── Filtered lists ──
+  // ── Computed stats from real data ──
+  const totalRevenue    = salesByRest.reduce((s, r) => s + r.totalRevenue, 0);
+  const totalOrders     = orders.length;
+  const totalUsers      = users.length;
+  const totalRests      = restaurants.length;
+  const activeRests     = restaurants.filter(r => r.status === "activo").length;
+
   const filteredRests = restaurants.filter(r => {
     const matchStatus = restFilter === "Todos" || r.status === restFilter.toLowerCase();
     const matchSearch = search === "" || r.name.toLowerCase().includes(search.toLowerCase());
@@ -285,20 +368,32 @@ export default function AdminDashboard() {
   });
 
   const filteredUsers = users.filter(u => {
-    const matchRole   = userFilter === "Todos" || u.role === userFilter.toLowerCase() || (userFilter === "Suspenderidos" && u.status === "suspendido");
+    const matchRole   = userFilter === "Todos" || u.role === userFilter.toLowerCase() || (userFilter === "Suspendidos" && u.status === "suspendido");
     const matchSearch = search === "" || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
     return matchRole && matchSearch;
   });
 
-  const filteredOrders = mockOrders.filter(o => {
-    const matchStatus = orderFilter === "All" || o.status === orderFilter.toLowerCase().replace(/ /g, "_");
-    const matchSearch = search === "" || o.id.toLowerCase().includes(search.toLowerCase()) || o.customer.toLowerCase().includes(search.toLowerCase());
+  const filteredOrders = orders.filter(o => {
+    const matchStatus = orderFilter === "Todos" || o.status === orderFilter;
+    const matchSearch = search === "" || o.id.toLowerCase().includes(search.toLowerCase()) || (o.customer ?? "").toLowerCase().includes(search.toLowerCase());
     return matchStatus && matchSearch;
   });
 
-  const chartMax = chartMetric === "ingresos"
-    ? Math.max(...mockWeekData.map(d => d.ingresos))
-    : Math.max(...mockWeekData.map(d => d.orders));
+  if (loading) return (
+    <div style={{ minHeight: "100vh", background: "#0d1117", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.4)", fontFamily: "DM Sans, sans-serif", gap: 12 }}>
+      <div style={{ width: 20, height: 20, border: "2px solid rgba(82,196,155,0.3)", borderTopColor: "#52c49b", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+      Cargando datos…
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ minHeight: "100vh", background: "#0d1117", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: "#e05c5c", fontFamily: "DM Sans, sans-serif" }}>
+      <div style={{ fontSize: "2rem" }}>⚠️</div>
+      <div>Error al cargar datos: {error}</div>
+      <button onClick={() => window.location.reload()} style={{ marginTop: 8, padding: "10px 20px", background: "#52c49b", border: "none", borderRadius: 8, color: "#0d1f1c", fontWeight: 700, cursor: "pointer" }}>Reintentar</button>
+    </div>
+  );
 
   return (
     <>
@@ -569,7 +664,7 @@ export default function AdminDashboard() {
           <div className="ad-nav-section">Navigation</div>
           {TABS.map(tab => (
             <button key={tab} className={"ad-nav-item" + (activeTab === tab ? " active" : "")} onClick={() => { setActiveTab(tab); setSearch(""); }}>
-              <span>{tab === "Resumen" ? "📊" : tab === "Restaurantes" ? "🍽️" : tab === "Usuarios" ? "👥" : "📦"}</span>
+              <span>{tab === "Overview" ? "📊" : tab === "Restaurants" ? "🍽️" : tab === "Users" ? "👥" : "📦"}</span>
               {tab}
             </button>
           ))}
@@ -581,7 +676,7 @@ export default function AdminDashboard() {
                 <div className="ad-admin-role">Super administrator</div>
               </div>
             </div>
-            <button className="ad-logout" onClick={() => navigate("/")}>← Cerrar sesión</button>
+            <button className="ad-logout" onClick={() => navigate("/")}>← Log out</button>
           </div>
         </aside>
 
@@ -598,13 +693,13 @@ export default function AdminDashboard() {
             <div className="ad-topbar-right">
               <div className="ad-search-wrap">
                 <span className="ad-search-icon">🔍</span>
-                <input className="ad-search" type="text" placeholder={"Search " + activeTab.toLowerCase() + "…"} value={search} onChange={e => setSearch(e.target.value)} />
+                <input className="ad-search" type="text" placeholder={"Buscar en " + activeTab.toLowerCase() + "…"} value={search} onChange={e => setSearch(e.target.value)} />
               </div>
               {activeTab === "Restaurantes" && (
-                <button className="ad-add-btn" onClick={openRestModal}>+ Agregar restaurante</button>
+                <button className="ad-add-btn" onClick={openRestModal}>+ Add restaurant</button>
               )}
               {activeTab === "Usuarios" && (
-                <button className="ad-add-btn" onClick={openUserModal}>+ Agregar usuario</button>
+                <button className="ad-add-btn" onClick={openUserModal}>+ Add user</button>
               )}
             </div>
           </div>
@@ -616,10 +711,10 @@ export default function AdminDashboard() {
               <>
                 <div className="ad-stats">
                   {[
-                    { label: "Ingresos totales",     icon: "💰", value: "$" + mockStats.totalRevenue.toLocaleString(), sub: "$" + mockStats.ingresosToday + " hoy", cls: "green"  },
-                    { label: "Pedidos totales",       icon: "📦", value: mockStats.totalOrders.toLocaleString(),        sub: mockStats.ordersToday + " hoy",         cls: ""       },
-                    { label: "Registered users",   icon: "👥", value: mockStats.totalUsers,                          sub: "+" + mockStats.newUsersWeek + " this week", cls: ""    },
-                    { label: "Restaurantes activos", icon: "🍽️", value: mockStats.activeRestaurants + "/" + mockStats.totalRestaurants, sub: (mockStats.totalRestaurants - mockStats.activeRestaurants) + " inactivos", cls: "yellow" },
+                    { label: "Ingresos totales",  icon: "💰", value: "$" + totalRevenue.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}), sub: "Ventas entregadas", cls: "green"  },
+                    { label: "Pedidos totales",    icon: "📦", value: totalOrders.toLocaleString(), sub: orders.filter(o=>o.status==="delivered").length + " entregados", cls: ""       },
+                    { label: "Usuarios registrados",icon: "👥", value: totalUsers, sub: users.filter(u=>u.role==="customer").length + " clientes", cls: ""    },
+                    { label: "Restaurantes activos",icon: "🍽️", value: activeRests + "/" + totalRests, sub: (totalRests - activeRests) + " inactivos", cls: "yellow" },
                   ].map((s, i) => (
                     <div key={s.label} className="ad-stat" style={{ animationDelay: i * 0.06 + "s" }}>
                       <div className="ad-stat-label">{s.icon} {s.label}</div>
@@ -635,22 +730,13 @@ export default function AdminDashboard() {
                     </div>
                     <div className="ad-chart-wrap">
                       <div className="ad-chart-toggles">
-                        <button className={"ad-chart-toggle" + (chartMetric === "ingresos" ? " active" : "")} onClick={() => setChartMetric("ingresos")}>Revenue</button>
+                        <button className={"ad-chart-toggle" + (chartMetric === "revenue" ? " active" : "")} onClick={() => setChartMetric("revenue")}>Revenue</button>
                         <button className={"ad-chart-toggle" + (chartMetric === "orders"  ? " active" : "")} onClick={() => setChartMetric("orders")}>Orders</button>
                       </div>
-                      <div className="ad-chart">
-                        {mockWeekData.map((d, i) => {
-                          const val    = chartMetric === "ingresos" ? d.ingresos : d.orders;
-                          const height = Math.round((val / chartMax) * 100);
-                          const isToday = i === mockWeekData.length - 1;
-                          return (
-                            <div key={d.day} className="ad-bar-wrap">
-                              <div className="ad-bar-val">{chartMetric === "ingresos" ? "$" + val : val}</div>
-                              <div className={"ad-bar" + (isToday ? " hoy" : "")} style={{ height: height + "%" }} />
-                              <div className={"ad-bar-day" + (isToday ? " hoy" : "")}>{d.day}</div>
-                            </div>
-                          );
-                        })}
+                      <div className="ad-chart" style={{ alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ color: "rgba(255,255,255,0.2)", fontSize: "0.82rem", textAlign: "center" }}>
+                          📊 Gráfica semanal — pendiente de endpoint
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -659,7 +745,7 @@ export default function AdminDashboard() {
                       <div className="ad-card-title">🧾 Latest orders</div>
                       <button className="ad-card-link" onClick={() => setActiveTab("Pedidos")}>View all →</button>
                     </div>
-                    {mockOrders.slice(0, 5).map(o => {
+                    {orders.slice(0, 5).map(o => {
                       const st = STATUS_CONFIG[o.status];
                       return (
                         <div key={o.id} className="ad-qrow">
@@ -683,11 +769,11 @@ export default function AdminDashboard() {
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.25)" }}>$limit</span>
                         <select className="ad-limit-select" value={topRatedLimit} onChange={e => setTopRatedLimit(Number(e.target.value))}>
-                          {[3, 5, 10, mockTopRated.length].map(n => <option key={n} value={n}>{n === mockTopRated.length ? "All" : "Top " + n}</option>)}
+                          {[3, 5, 10].map(n => <option key={n} value={n}>Top {n}</option>)}
                         </select>
                       </div>
                     </div>
-                    {mockTopRated.slice(0, topRatedLimit).map((r, i) => (
+                    {topRated.slice(0, topRatedLimit).map((r, i) => (
                       <div key={r.id} className="ad-rank-row">
                         <span className={"ad-rank-num" + (i < 3 ? " top" : "")}>#{i + 1}</span>
                         <span className="ad-rank-emoji">{r.image}</span>
@@ -698,7 +784,7 @@ export default function AdminDashboard() {
                             <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.3)" }}>{r.avgRating.toFixed(1)}</span>
                           </div>
                         </div>
-                        <span className="ad-rank-meta">{r.totalReviews} reseñas</span>
+                        <span className="ad-rank-meta">{r.totalReviews} reviews</span>
                       </div>
                     ))}
                   </div>
@@ -708,14 +794,14 @@ export default function AdminDashboard() {
                       <div className="ad-card-title">💰 Revenue by restaurant</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.25)" }}>$limit</span>
-                        <select className="ad-limit-select" value={ingresosLimit} onChange={e => setRevenueLimit(Number(e.target.value))}>
-                          {[3, 5, mockRevenueByRestaurant.length].map(n => <option key={n} value={n}>{n === mockRevenueByRestaurant.length ? "All" : "Top " + n}</option>)}
+                        <select className="ad-limit-select" value={revenueLimit} onChange={e => setRevenueLimit(Number(e.target.value))}>
+                          {[3, 5, salesByRest.length].map(n => <option key={n} value={n}>{n === salesByRest.length ? "Todos" : "Top " + n}</option>)}
                         </select>
                       </div>
                     </div>
                     <div style={{ padding: "12px 20px" }}>
-                      {mockRevenueByRestaurant.slice(0, ingresosLimit).map((r) => {
-                        const maxRev = mockRevenueByRestaurant[0].totalRevenue;
+                      {salesByRest.slice(0, revenueLimit).map((r) => {
+                        const maxRev = salesByRest[0]?.totalRevenue ?? 1;
                         const pct    = Math.round((r.totalRevenue / maxRev) * 100);
                         return (
                           <div key={r.id} style={{ marginBottom: 13 }}>
@@ -744,7 +830,7 @@ export default function AdminDashboard() {
             {activeTab === "Restaurantes" && (
               <>
                 <div className="ad-filters">
-                  {["All", "Active", "Inactive"].map(f => (
+                  {["Todos", "Activos", "Inactivos"].map(f => (
                     <button key={f} className={"ad-filter" + (restFilter === f ? " active" : "")} onClick={() => setRestFilter(f)}>{f}</button>
                   ))}
                 </div>
@@ -752,9 +838,9 @@ export default function AdminDashboard() {
                   <table className="ad-table">
                     <thead>
                       <tr>
-                        <th>Restaurante</th><th>Categoría</th><th>Dueño</th>
-                        <th>Productos</th><th>Pedidos</th><th>Calificación</th>
-                        <th>Activo</th><th>Acciones</th>
+                        <th>Restaurant</th><th>Category</th><th>Owner</th>
+                        <th>Menu items</th><th>Orders</th><th>Rating</th>
+                        <th>Active</th><th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -776,7 +862,7 @@ export default function AdminDashboard() {
                           <td><span className="ad-rating">{r.rating > 0 ? "⭐ " + r.rating : "—"}</span></td>
                           <td>
                             <button className="ad-switch-wrap" onClick={() => toggleRestStatus(r.id)}>
-                              <div className={"ad-switch " + (r.status === "activo" ? "on" : "off")}>
+                              <div className={"ad-switch " + (r.status === "active" ? "on" : "off")}>
                                 <div className="ad-switch-knob" />
                               </div>
                             </button>
@@ -801,8 +887,8 @@ export default function AdminDashboard() {
             {activeTab === "Usuarios" && (
               <>
                 <div className="ad-filters">
-                  {["All", "Cliente", "Restaurant", "Suspenderidos"].map(f => (
-                    <button key={f} className={"ad-filter" + (userFilter === f ? " active" : "")} onClick={() => setUserFilter(f)}>{f}</button>
+                  {["Todos", "customer", "restaurant", "Suspendidos"].map(f => (
+                    <button key={f} className={"ad-filter" + (userFilter === f ? " active" : "")} onClick={() => setUserFilter(f)}>{f === "customer" ? "Cliente" : f === "restaurant" ? "Restaurante" : f}</button>
                   ))}
                 </div>
                 <div className="ad-table-wrap">
@@ -828,7 +914,7 @@ export default function AdminDashboard() {
                           <td style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, color: u.totalSpent ? "#52c49b" : "rgba(255,255,255,0.2)", fontSize: "0.88rem" }}>
                             {u.totalSpent != null ? "$" + u.totalSpent.toFixed(2) : "—"}
                           </td>
-                          <td><span className={"ad-status " + u.status}>{u.status}</span></td>
+                          <td><span className={"ad-status " + (u.status === "activo" ? "active" : u.status === "suspendido" ? "suspended" : "inactive")}>{u.status}</span></td>
                           <td>
                             <button className={"ad-btn-sm " + (u.status === "activo" ? "ad-btn-toggle-on" : "ad-btn-toggle-off")} onClick={() => toggleUserStatus(u.id)}>
                               {u.status === "activo" ? "Suspender" : "Reactivar"}
@@ -846,14 +932,14 @@ export default function AdminDashboard() {
             {activeTab === "Pedidos" && (
               <>
                 <div className="ad-filters">
-                  {["All", "Pending", "Preparing", "On the way", "Delivered", "Cancelled"].map(f => (
+                  {["Todos", "pending", "preparing", "on_the_way", "delivered", "cancelled"].map(f => (
                     <button key={f} className={"ad-filter" + (orderFilter === f ? " active" : "")} onClick={() => setOrderFilter(f)}>{f}</button>
                   ))}
                 </div>
                 <div className="ad-table-wrap">
                   <table className="ad-table">
                     <thead>
-                      <tr><th>ID Pedido</th><th>Cliente</th><th>Restaurante</th><th>Total</th><th>Estado</th><th>Fecha</th></tr>
+                      <tr><th>Order ID</th><th>Customer</th><th>Restaurant</th><th>Total</th><th>Status</th><th>Date</th></tr>
                     </thead>
                     <tbody>
                       {filteredOrders.map(o => {
@@ -884,7 +970,7 @@ export default function AdminDashboard() {
             <div className="ad-wizard" onClick={e => e.stopPropagation()}>
               <div className="ad-wizard-header">
                 <div className="ad-wizard-title">
-                  Add new restaurant
+                  Agregar restaurante
                   <button className="ad-wizard-close" onClick={closeRestModal}>✕</button>
                 </div>
                 {/* Step indicator */}
@@ -908,9 +994,9 @@ export default function AdminDashboard() {
                 {/* ── STEP 0: Restaurant info ── */}
                 {wizardStep === 0 && (
                   <>
-                    <div className="ad-section-label">Restaurant details</div>
+                    <div className="ad-section-label">Detalles del restaurante</div>
                     <div className="ad-field">
-                      <label>Icono</label>
+                      <label>Icon</label>
                       <div className="ad-emoji-grid">
                         {EMOJI_OPTS.map(e => (
                           <button key={e} className={"ad-emoji-opt" + (restForm.image === e ? " selected" : "")} onClick={() => handleRestFormChange("image", e)}>{e}</button>
@@ -919,12 +1005,12 @@ export default function AdminDashboard() {
                     </div>
                     <div className="ad-field-row">
                       <div className="ad-field">
-                        <label>Restaurant name</label>
-                        <input type="text" placeholder="e.g. Burger Palace" className={restErrors.name ? "err" : ""} value={restForm.name} onChange={e => handleRestFormChange("name", e.target.value)} />
+                        <label>Nombre del restaurante</label>
+                        <input type="text" placeholder="Ej. Burger Palace" className={restErrors.name ? "err" : ""} value={restForm.name} onChange={e => handleRestFormChange("name", e.target.value)} />
                         {restErrors.name && <div className="ad-field-error">{restErrors.name}</div>}
                       </div>
                       <div className="ad-field">
-                        <label>Categoría</label>
+                        <label>Category</label>
                         <select value={restForm.category} onChange={e => handleRestFormChange("category", e.target.value)}>
                           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
@@ -932,12 +1018,12 @@ export default function AdminDashboard() {
                     </div>
                     <div className="ad-field-row">
                       <div className="ad-field">
-                        <label>Correo</label>
+                        <label>Email</label>
                         <input type="email" placeholder="rest@email.com" className={restErrors.email ? "err" : ""} value={restForm.email} onChange={e => handleRestFormChange("email", e.target.value)} />
                         {restErrors.email && <div className="ad-field-error">{restErrors.email}</div>}
                       </div>
                       <div className="ad-field">
-                        <label>Teléfono</label>
+                        <label>Phone</label>
                         <input type="text" placeholder="555-0100" className={restErrors.phone ? "err" : ""} value={restForm.phone} onChange={e => handleRestFormChange("phone", e.target.value)} />
                         {restErrors.phone && <div className="ad-field-error">{restErrors.phone}</div>}
                       </div>
@@ -948,20 +1034,20 @@ export default function AdminDashboard() {
                 {/* ── STEP 1: Owner account ── */}
                 {wizardStep === 1 && (
                   <>
-                    <div className="ad-section-label">Owner credentials</div>
+                    <div className="ad-section-label">Credenciales del dueño</div>
                     <div className="ad-field">
                       <label>Full name</label>
-                      <input type="text" placeholder="John Smith" className={restErrors.ownerName ? "err" : ""} value={restForm.ownerName} onChange={e => handleRestFormChange("ownerName", e.target.value)} />
+                      <input type="text" placeholder="Juan García" className={restErrors.ownerName ? "err" : ""} value={restForm.ownerName} onChange={e => handleRestFormChange("ownerName", e.target.value)} />
                       {restErrors.ownerName && <div className="ad-field-error">{restErrors.ownerName}</div>}
                     </div>
                     <div className="ad-field">
-                      <label>Correo (login)</label>
-                      <input type="email" placeholder="owner@email.com" className={restErrors.ownerEmail ? "err" : ""} value={restForm.ownerEmail} onChange={e => handleRestFormChange("ownerEmail", e.target.value)} />
+                      <label>Email (login)</label>
+                      <input type="email" placeholder="dueno@email.com" className={restErrors.ownerEmail ? "err" : ""} value={restForm.ownerEmail} onChange={e => handleRestFormChange("ownerEmail", e.target.value)} />
                       {restErrors.ownerEmail && <div className="ad-field-error">{restErrors.ownerEmail}</div>}
                     </div>
                     <div className="ad-field">
                       <label>Password</label>
-                      <input type="password" placeholder="Min 6 characters" className={restErrors.ownerPassword ? "err" : ""} value={restForm.ownerPassword} onChange={e => handleRestFormChange("ownerPassword", e.target.value)} />
+                      <input type="password" placeholder="Mínimo 6 caracteres" className={restErrors.ownerPassword ? "err" : ""} value={restForm.ownerPassword} onChange={e => handleRestFormChange("ownerPassword", e.target.value)} />
                       {restErrors.ownerPassword && <div className="ad-field-error">{restErrors.ownerPassword}</div>}
                     </div>
                     <div style={{ padding: "12px 14px", background: "rgba(96,165,250,0.07)", border: "1px solid rgba(96,165,250,0.15)", borderRadius: 10, fontSize: "0.8rem", color: "rgba(255,255,255,0.4)", lineHeight: 1.5, marginTop: 4 }}>
@@ -973,28 +1059,28 @@ export default function AdminDashboard() {
                 {/* ── STEP 2: Initial menu ── */}
                 {wizardStep === 2 && (
                   <>
-                    <div className="ad-section-label">Add menu items — {restForm.name || "new restaurant"}</div>
+                    <div className="ad-section-label">Agregar productos — {restForm.name || "new restaurant"}</div>
                     <div className="ad-field-row">
                       <div className="ad-field">
                         <label>Item name</label>
-                        <input type="text" placeholder="e.g. Classic Burger" className={restErrors.name ? "err" : ""} value={menuForm.name} onChange={e => handleMenuFormChange("name", e.target.value)} />
+                        <input type="text" placeholder="Ej. Hamburguesa Clásica" className={restErrors.name ? "err" : ""} value={menuForm.name} onChange={e => handleMenuFormChange("name", e.target.value)} />
                         {restErrors.name && <div className="ad-field-error">{restErrors.name}</div>}
                       </div>
                       <div className="ad-field">
-                        <label>Precio ($)</label>
+                        <label>Price ($)</label>
                         <input type="number" min="0" step="0.01" placeholder="0.00" className={restErrors.price ? "err" : ""} value={menuForm.price} onChange={e => handleMenuFormChange("price", e.target.value)} />
                         {restErrors.price && <div className="ad-field-error">{restErrors.price}</div>}
                       </div>
                     </div>
                     <div className="ad-field-row">
                       <div className="ad-field">
-                        <label>Categoría</label>
+                        <label>Category</label>
                         <select value={menuForm.category} onChange={e => handleMenuFormChange("category", e.target.value)}>
                           {MENU_CATS.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                       </div>
                       <div className="ad-field">
-                        <label>Icono</label>
+                        <label>Icon</label>
                         <div className="ad-emoji-grid" style={{ marginTop: 2 }}>
                           {EMOJI_OPTS.slice(0, 10).map(e => (
                             <button key={e} className={"ad-emoji-opt" + (menuForm.image === e ? " selected" : "")} onClick={() => handleMenuFormChange("image", e)}>{e}</button>
@@ -1002,7 +1088,7 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     </div>
-                    <button className="ad-add-item-btn" onClick={addMenuItem}>+ Add to menu</button>
+                    <button className="ad-add-item-btn" onClick={addMenuItem}>+ Agregar al menú</button>
 
                     {menuItems.length > 0 && (
                       <div className="ad-menu-draft">
@@ -1020,7 +1106,7 @@ export default function AdminDashboard() {
 
                     {menuItems.length === 0 && (
                       <div style={{ textAlign: "center", padding: "24px 0", color: "rgba(255,255,255,0.2)", fontSize: "0.84rem" }}>
-                        Sin productos aún. Puedes omitir este paso si lo deseas.
+                        No items added yet. You can skip this step if needed.
                       </div>
                     )}
                   </>
@@ -1033,10 +1119,10 @@ export default function AdminDashboard() {
                     <div className="ad-review-block">
                       <div className="ad-review-block-title">Restaurant</div>
                       {[
-                        ["Nombre",     restForm.image + " " + restForm.name],
-                        ["Categoría", restForm.category],
-                        ["Email",    restForm.email],
-                        ["Phone",    restForm.phone],
+                        ["Name",     restForm.image + " " + restForm.name],
+                        ["Category", restForm.category],
+                        ["Correo",    restForm.email],
+                        ["Teléfono",  restForm.phone],
                       ].map(([l, v]) => (
                         <div key={l} className="ad-review-row">
                           <span className="ad-review-label">{l}</span>
@@ -1047,9 +1133,9 @@ export default function AdminDashboard() {
                     <div className="ad-review-block">
                       <div className="ad-review-block-title">Owner account</div>
                       {[
-                        ["Nombre",  restForm.ownerName],
-                        ["Email", restForm.ownerEmail],
-                        ["Password", "••••••"],
+                        ["Name",  restForm.ownerName],
+                        ["Correo", restForm.ownerEmail],
+                        ["Contraseña", "••••••"],
                       ].map(([l, v]) => (
                         <div key={l} className="ad-review-row">
                           <span className="ad-review-label">{l}</span>
@@ -1070,7 +1156,7 @@ export default function AdminDashboard() {
                         </div>
                       ))}
                       {menuItems.length > 3 && (
-                        <div style={{ fontSize: "0.76rem", color: "rgba(255,255,255,0.25)", marginTop: 4 }}>+ {menuItems.length - 3} more items</div>
+                        <div style={{ fontSize: "0.76rem", color: "rgba(255,255,255,0.25)", marginTop: 4 }}>+ {menuItems.length - 3} productos más</div>
                       )}
                     </div>
                   </>
@@ -1080,16 +1166,16 @@ export default function AdminDashboard() {
 
               <div className="ad-wizard-footer">
                 {wizardStep > 0 && (
-                  <button className="ad-wizard-prev" onClick={prevStep}>← Atrás</button>
+                  <button className="ad-wizard-prev" onClick={prevStep}>← Back</button>
                 )}
                 {wizardStep < 3 ? (
                   <button className="ad-wizard-next" onClick={nextStep}>
-                    {wizardStep === 2 ? "Revisar →" : "Continuar →"}
+                    {wizardStep === 2 ? "Review →" : "Continue →"}
                   </button>
                 ) : (
                   <button className="ad-wizard-next" onClick={saveRestaurant} disabled={saving}>
                     {saving && <span className="ad-spinner" />}
-                    {saving ? "Creating…" : "Create restaurant"}
+                    {saving ? "Creando…" : "Crear restaurante"}
                   </button>
                 )}
               </div>
@@ -1102,23 +1188,23 @@ export default function AdminDashboard() {
           <div className="ad-overlay" onClick={closeUserModal}>
             <div className="ad-modal" onClick={e => e.stopPropagation()}>
               <div className="ad-modal-header">
-                <div className="ad-modal-title">Create new user</div>
+                <div className="ad-modal-title">Crear usuario</div>
                 <button className="ad-modal-close" onClick={closeUserModal}>✕</button>
               </div>
               <div className="ad-modal-body">
                 <div className="ad-field">
                   <label>Full name</label>
-                  <input type="text" placeholder="Jane Smith" className={userErrors.name ? "err" : ""} value={userForm.name} onChange={e => { setUserForm(p => ({ ...p, name: e.target.value })); if (userErrors.name) setUserErrors(p => { const n = { ...p }; delete n.name; return n; }); }} />
+                  <input type="text" placeholder="Ana García" className={userErrors.name ? "err" : ""} value={userForm.name} onChange={e => { setUserForm(p => ({ ...p, name: e.target.value })); if (userErrors.name) setUserErrors(p => { const n = { ...p }; delete n.name; return n; }); }} />
                   {userErrors.name && <div className="ad-field-error">{userErrors.name}</div>}
                 </div>
                 <div className="ad-field">
-                  <label>Correo</label>
+                  <label>Email</label>
                   <input type="email" placeholder="user@email.com" className={userErrors.email ? "err" : ""} value={userForm.email} onChange={e => { setUserForm(p => ({ ...p, email: e.target.value })); if (userErrors.email) setUserErrors(p => { const n = { ...p }; delete n.email; return n; }); }} />
                   {userErrors.email && <div className="ad-field-error">{userErrors.email}</div>}
                 </div>
                 <div className="ad-field">
                   <label>Password</label>
-                  <input type="password" placeholder="Min 6 characters" className={userErrors.password ? "err" : ""} value={userForm.password} onChange={e => { setUserForm(p => ({ ...p, password: e.target.value })); if (userErrors.password) setUserErrors(p => { const n = { ...p }; delete n.password; return n; }); }} />
+                  <input type="password" placeholder="Mínimo 6 caracteres" className={userErrors.password ? "err" : ""} value={userForm.password} onChange={e => { setUserForm(p => ({ ...p, password: e.target.value })); if (userErrors.password) setUserErrors(p => { const n = { ...p }; delete n.password; return n; }); }} />
                   {userErrors.password && <div className="ad-field-error">{userErrors.password}</div>}
                 </div>
                 <div className="ad-field">
@@ -1130,10 +1216,10 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="ad-modal-footer">
-                <button className="ad-modal-cancel" onClick={closeUserModal}>Cancelar</button>
+                <button className="ad-modal-cancel" onClick={closeUserModal}>Cancel</button>
                 <button className="ad-modal-save" onClick={saveUser} disabled={savingUser}>
                   {savingUser && <span className="ad-spinner" />}
-                  {savingUser ? "Creating…" : "Create user"}
+                  {savingUser ? "Creando…" : "Crear usuario"}
                 </button>
               </div>
             </div>
@@ -1145,15 +1231,15 @@ export default function AdminDashboard() {
           <div className="ad-overlay" onClick={() => setDeleteRestId(null)}>
             <div className="ad-delete-modal" onClick={e => e.stopPropagation()}>
               <div className="ad-delete-icon">🗑️</div>
-              <h3>Remove restaurant?</h3>
+              <h3>¿Eliminar restaurante?</h3>
               <p>
-                This will permanently remove <strong style={{ color: "#fff" }}>
+                Esto eliminará permanentemente a <strong style={{ color: "#fff" }}>
                   {restaurants.find(r => r.id === deleteRestId)?.name}
-                </strong> and all associated data. This cannot be undone.
+                </strong> y todos sus datos. Esta acción no se puede deshacer.
               </p>
               <div className="ad-delete-actions">
-                <button className="ad-delete-cancel" onClick={() => setDeleteRestId(null)}>Cancelar</button>
-                <button className="ad-delete-confirm" onClick={handleDeleteRest}>Yes, remove</button>
+                <button className="ad-delete-cancel" onClick={() => setDeleteRestId(null)}>Cancel</button>
+                <button className="ad-delete-confirm" onClick={handleDeleteRest}>Sí, eliminar</button>
               </div>
             </div>
           </div>

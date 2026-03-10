@@ -10,6 +10,7 @@ export default function Login() {
     email: "",
     password: "",
     confirmPassword: "",
+    role: "customer",
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -17,7 +18,7 @@ export default function Login() {
   const roleRoutes = {
     customer:   "/restaurants",
     restaurant: "/restaurant-dashboard",
-    admin:      "/admin-dashboard",
+    admin:      "/admin",
   };
 
   const validate = () => {
@@ -44,7 +45,7 @@ export default function Login() {
         const payload = helpers.toRegisterPayload(form);
         const created = await users.create(payload);
         helpers.saveSession(created);
-        navigate("/restaurants");
+        navigate(roleRoutes[created.role] ?? "/restaurants");
       }
     } catch (err) {
       setErrors({ submit: err.message });
@@ -260,6 +261,57 @@ export default function Login() {
           font-weight: 300;
         }
 
+        /* ROLE CARDS */
+        .cb-role-label {
+          font-size: 0.78rem;
+          font-weight: 500;
+          color: rgba(255,255,255,0.4);
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          margin-bottom: 10px;
+        }
+
+        .cb-role-cards {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+          margin-bottom: 20px;
+        }
+
+        .cb-role-card {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
+          padding: 14px 8px;
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 10px;
+          cursor: pointer;
+          transition: all 0.18s;
+          font-family: 'DM Sans', sans-serif;
+        }
+
+        .cb-role-card:hover {
+          border-color: rgba(82,196,155,0.3);
+          background: rgba(82,196,155,0.05);
+        }
+
+        .cb-role-card.active {
+          border-color: #52c49b;
+          background: rgba(82,196,155,0.1);
+        }
+
+        .cb-role-card-icon { font-size: 1.4rem; }
+
+        .cb-role-card-name {
+          font-size: 0.78rem;
+          font-weight: 500;
+          color: rgba(255,255,255,0.5);
+        }
+
+        .cb-role-card.active .cb-role-card-name { color: #52c49b; font-weight: 600; }
+
         /* ROLE CARDS — solo registro */
         /* role styles removed — customers only */
           font-size: 0.78rem;
@@ -381,6 +433,7 @@ export default function Login() {
         <div className="cb-left">
           <div className="cb-brand">
             <div className="cb-brand-logo">Click<span>Bite</span></div>
+            <div className="cb-brand-tagline">Comida a domicilio, reinventada</div>
           </div>
 
           <div className="cb-hero-text">
@@ -389,6 +442,9 @@ export default function Login() {
               favorita, <em>entregada</em><br />
               al instante.
             </h2>
+            <p>
+              Descubre cientos de restaurantes cerca de ti y recibe comida fresca directamente a tu puerta.
+            </p>
           </div>
         </div>
 
@@ -412,9 +468,37 @@ export default function Login() {
           <div className="cb-form-area" key={mode}>
             <div className="cb-form-heading">
               <h1>{mode === "login" ? "Bienvenido de nuevo" : "Únete a ClickBite"}</h1>
+              <p>
+                {mode === "login"
+                  ? "Ingresa tus credenciales para continuar"
+                  : "Crea tu cuenta para empezar"}
+              </p>
             </div>
 
             {/* Restaurants are created by admin — register is customer only */}
+
+            {mode === "register" && (
+              <div style={{ marginBottom: 20 }}>
+                <div className="cb-role-label">Tipo de cuenta</div>
+                <div className="cb-role-cards">
+                  {[
+                    { value: "customer",   icon: "🧑",  label: "Cliente"      },
+                    { value: "restaurant", icon: "🍽️",  label: "Restaurante"  },
+                    { value: "admin",      icon: "🛡️",  label: "Admin"        },
+                  ].map(r => (
+                    <button
+                      key={r.value}
+                      type="button"
+                      className={"cb-role-card" + (form.role === r.value ? " active" : "")}
+                      onClick={() => handleChange("role", r.value)}
+                    >
+                      <span className="cb-role-card-icon">{r.icon}</span>
+                      <span className="cb-role-card-name">{r.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {mode === "register" && (
               <div className="cb-field">
