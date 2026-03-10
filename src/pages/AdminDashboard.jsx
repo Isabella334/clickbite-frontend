@@ -212,22 +212,24 @@ export default function AdminDashboard() {
   const saveRestaurant = async () => {
     setSaving(true);
     try {
-      const restPayload = helpers.toCreateRestaurantPayload({
-        name:        restForm.name,
-        description: "",
-        categories:  [restForm.category],
-        phone:       restForm.phone,
-        email:       restForm.email,
-      });
-      const created = await restaurantsApi.create(restPayload);
-
-      // Create owner user account
+      // 1. Crear el usuario dueño primero para obtener su ID
       const ownerPayload = helpers.toCreateOwnerPayload({
         ownerName:     restForm.ownerName,
         ownerEmail:    restForm.ownerEmail,
         ownerPassword: restForm.ownerPassword,
       });
       const ownerCreated = await usersApi.create(ownerPayload);
+
+      // 2. Crear el restaurante con owner_id apuntando al usuario recién creado
+      const restPayload = helpers.toCreateRestaurantPayload({
+        name:        restForm.name,
+        description: "",
+        category:    restForm.category,
+        phone:       restForm.phone,
+        email:       restForm.email,
+        ownerId:     ownerCreated.id,  // ← vincula restaurant → user
+      });
+      const created = await restaurantsApi.create(restPayload);
 
       setRestaurants(prev => [{
         id:        created.id,
