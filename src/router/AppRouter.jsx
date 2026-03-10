@@ -3,6 +3,8 @@ import { BrowserRouter, Route, Routes } from "react-router-dom"
 import Login from "../pages/Login"
 import Menu from "../pages/Menu"
 import OrderConfirm from "../pages/OrderConfirm"
+import History from "../pages/OrderHistory"
+import RestaurantDashboard from "../pages/RestaurantDashboard"
 import Restaurants from "../pages/Restaurants"
 import Review from "../pages/Review"
 
@@ -22,6 +24,10 @@ export default function AppRouter() {
         <Route path="/confirm" element={<OrderConfirm />} />
 
         <Route path="/review" element={<Review />} />
+
+        <Route path="/order-history" element={<History />} />
+
+        <Route path="/restaurant-dashboard" element={<RestaurantDashboard />} />
 
       </Routes>
 
