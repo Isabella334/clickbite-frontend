@@ -1,10 +1,6 @@
-// ─────────────────────────────────────────────
-// STATIC CONFIG
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { menuItems as menuItemsApi, restaurants as restaurantsApi, analytics, helpers, files as filesApi } from "../services/api";
-
-// ─────────────────────────────────────────────
 
 const CATEGORIES = ["Burgers", "Sides", "Drinks", "Desserts", "Entradas", "Platos principales", "Bebidas", "Postres", "Otros"];
 const EMOJI_OPTIONS = ["🍔","🥩","🍄","🌶️","🍟","🧅","🥗","🥤","🍋","🍫","🥧","🍕","🌮","🍜","🍣","🍛","🍗","🍝","🧁","☕"];
@@ -223,7 +219,27 @@ const CSS = `
   .rd-bs-rank-1{border-color:rgba(251,191,36,0.3);background:rgba(251,191,36,0.05)}
   .rd-bs-rank-2{border-color:rgba(148,163,184,0.25)}
   .rd-bs-rank-3{border-color:rgba(205,127,50,0.2)}
-  @media(max-width:720px){.rd-sidebar{display:none}.rd-content{padding:20px}.rd-topbar{padding:14px 20px}}
+  /* TABS */
+  .rd-tabs{display:flex;gap:0;border-bottom:1px solid rgba(255,255,255,0.06);padding:0 36px;background:#111820}
+  .rd-tab-btn{padding:14px 20px;background:transparent;border:none;border-bottom:2px solid transparent;color:rgba(255,255,255,0.35);font-family:'DM Sans',sans-serif;font-size:0.88rem;cursor:pointer;transition:all 0.2s;margin-bottom:-1px}
+  .rd-tab-btn:hover{color:rgba(255,255,255,0.7)}
+  .rd-tab-btn.active{color:#52c49b;border-bottom-color:#52c49b;font-weight:600}
+  /* STATS PANEL */
+  .rd-stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+  .rd-stat-card{background:#111820;border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:20px}
+  .rd-stat-label{font-size:0.73rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:rgba(255,255,255,0.3);margin-bottom:8px}
+  .rd-stat-value{font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:700;color:#52c49b}
+  .rd-stat-sub{font-size:0.78rem;color:rgba(255,255,255,0.25);margin-top:4px}
+  .rd-stats-section-title{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:#fff;margin-bottom:14px}
+  .rd-stats-items-list{display:flex;flex-direction:column;gap:10px}
+  .rd-stats-item-row{display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:10px}
+  .rd-stats-item-rank{width:24px;height:24px;border-radius:50%;background:rgba(82,196,155,0.1);color:#52c49b;font-size:0.75rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .rd-stats-item-name{flex:1;font-size:0.88rem;color:#fff}
+  .rd-stats-item-sold{font-size:0.82rem;color:#52c49b;font-weight:600;white-space:nowrap}
+  .rd-stats-bar-wrap{width:100px;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;flex-shrink:0}
+  .rd-stats-bar-fill{height:100%;background:linear-gradient(90deg,#52c49b,#1a7a58);border-radius:3px}
+  .rd-stats-empty{text-align:center;padding:60px 20px;color:rgba(255,255,255,0.2);font-size:0.9rem}
+  @media(max-width:720px){.rd-sidebar{display:none}.rd-content{padding:20px}.rd-topbar{padding:14px 20px}.rd-tabs{padding:0 20px}}
 
   /* Image upload in modal */
   .rd-img-mode-toggle{display:flex;gap:0;margin-bottom:12px;border:1px solid rgba(255,255,255,0.1);border-radius:9px;overflow:hidden}
@@ -282,6 +298,9 @@ export default function RestaurantDashboard() {
   const [saving,      setSaving]      = useState(false);
   const [uploading,   setUploading]   = useState(false);
   const [uploadPreview, setUploadPreview] = useState(null); // base64 preview URL
+  const [activeTab,   setActiveTab]   = useState("menu"); // "menu" | "stats"
+  const [salesStats,  setSalesStats]  = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // Delete confirm (single or bulk)
   const [deleteTarget, setDeleteTarget] = useState(null); // { ids: string[], labels: string[] }
@@ -482,6 +501,33 @@ export default function RestaurantDashboard() {
       closeModal();
     } catch (err) { setFormErrors({ submit: err.message }); }
     finally { setSaving(false); }
+  };
+
+  // Fetch sales stats for this restaurant when stats tab is opened
+  const fetchSalesStats = async () => {
+    if (!restaurant?.id) return;
+    setStatsLoading(true);
+    try {
+      const [salesData, topItemsData] = await Promise.all([
+        analytics.getSalesByRestaurant(),
+        analytics.getTopSellingItems(),
+      ]);
+      // Filter to this restaurant only
+      const myStats = (salesData ?? []).find(s => s.restaurant_id === restaurant.id);
+      // Filter top items to items in this restaurant
+      const myItemIds = new Set(items.map(i => i.id));
+      const myTopItems = (topItemsData ?? []).filter(i => myItemIds.has(i.menu_item_id)).slice(0, 6);
+      setSalesStats({ totalSales: myStats?.total_sales ?? 0, topItems: myTopItems });
+    } catch (e) {
+      setSalesStats({ totalSales: 0, topItems: [] });
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === "stats" && !salesStats) fetchSalesStats();
   };
 
   const handleFormChange = (field, value) => {
@@ -716,19 +762,89 @@ export default function RestaurantDashboard() {
         <div className="rd-main">
           <div className="rd-topbar">
             <div>
-              <div className="rd-topbar-title">Gestion del menu</div>
-              <div className="rd-topbar-sub">{items.length} productos - {items.filter(i=>!i.available).length} no disponibles</div>
-            </div>
-            <div className="rd-topbar-right">
-              <div className="rd-search-wrap">
-                <span className="rd-search-icon">🔍</span>
-                <input className="rd-search" type="text" placeholder="Buscar..." value={search} onChange={e=>setSearch(e.target.value)}/>
+              <div className="rd-topbar-title">
+                {activeTab === "menu" ? "Gestion del menu" : "Estadisticas"}
               </div>
-              <button className="rd-add-btn" onClick={openCreate}>+ Agregar producto</button>
+              <div className="rd-topbar-sub">
+                {activeTab === "menu"
+                  ? items.length + " productos - " + items.filter(i=>!i.available).length + " no disponibles"
+                  : "Ventas e items mas populares de tu restaurante"}
+              </div>
             </div>
+            {activeTab === "menu" && (
+              <div className="rd-topbar-right">
+                <div className="rd-search-wrap">
+                  <span className="rd-search-icon">🔍</span>
+                  <input className="rd-search" type="text" placeholder="Buscar..." value={search} onChange={e=>setSearch(e.target.value)}/>
+                </div>
+                <button className="rd-add-btn" onClick={openCreate}>+ Agregar producto</button>
+              </div>
+            )}
           </div>
 
-          <div className="rd-content">
+          {/* TABS */}
+          <div className="rd-tabs">
+            <button className={"rd-tab-btn"+(activeTab==="menu"?" active":"")} onClick={()=>handleTabChange("menu")}>Menu</button>
+            <button className={"rd-tab-btn"+(activeTab==="stats"?" active":"")} onClick={()=>handleTabChange("stats")}>Estadisticas</button>
+          </div>
+
+          {/* STATS TAB */}
+          {activeTab === "stats" && (
+            <div className="rd-content">
+              {statsLoading ? (
+                <div className="rd-stats-empty">Cargando estadisticas...</div>
+              ) : salesStats ? (
+                <>
+                  <div className="rd-stats-grid">
+                    <div className="rd-stat-card">
+                      <div className="rd-stat-label">Ventas totales</div>
+                      <div className="rd-stat-value">Q{salesStats.totalSales.toLocaleString()}</div>
+                      <div className="rd-stat-sub">Ordenes entregadas</div>
+                    </div>
+                    <div className="rd-stat-card">
+                      <div className="rd-stat-label">Productos en menu</div>
+                      <div className="rd-stat-value">{items.length}</div>
+                      <div className="rd-stat-sub">{items.filter(i=>i.available).length} disponibles</div>
+                    </div>
+                    <div className="rd-stat-card">
+                      <div className="rd-stat-label">Calificacion</div>
+                      <div className="rd-stat-value">{restaurant?.avg_rating ? Number(restaurant.avg_rating).toFixed(1) : "-"}</div>
+                      <div className="rd-stat-sub">{restaurant?.total_reviews ?? 0} resenas</div>
+                    </div>
+                  </div>
+                  {salesStats.topItems.length > 0 && (
+                    <>
+                      <div className="rd-stats-section-title">Tus productos mas vendidos</div>
+                      <div className="rd-stats-items-list">
+                        {salesStats.topItems.map((item, i) => {
+                          const maxSold = salesStats.topItems[0]?.total_sold || 1;
+                          const pct = Math.round((item.total_sold / maxSold) * 100);
+                          return (
+                            <div key={item.menu_item_id} className="rd-stats-item-row">
+                              <div className="rd-stats-item-rank">{i+1}</div>
+                              <div className="rd-stats-item-name">{item.name}</div>
+                              <div className="rd-stats-bar-wrap">
+                                <div className="rd-stats-bar-fill" style={{width: pct + "%"}}/>
+                              </div>
+                              <div className="rd-stats-item-sold">{item.total_sold.toLocaleString()} uds.</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                  {salesStats.topItems.length === 0 && (
+                    <div className="rd-stats-empty">Aun no hay datos de ventas para tus productos.</div>
+                  )}
+                </>
+              ) : (
+                <div className="rd-stats-empty">No se pudieron cargar las estadisticas.</div>
+              )}
+            </div>
+          )}
+
+          {/* MENU TAB */}
+          {activeTab === "menu" && <div className="rd-content">
             {bestsellers.length > 0 && (
               <div className="rd-bs-section">
                 <div className="rd-bs-header"><div className="rd-bs-title">Mas vendidos</div></div>
@@ -833,8 +949,7 @@ export default function RestaurantDashboard() {
                 </table>
               )}
             </div>
-          </div>
-        </div>
+          </div>}
 
         {/* Edit item modal */}
         {modalOpen && (
@@ -960,6 +1075,7 @@ export default function RestaurantDashboard() {
 
         {toast && <div className="rd-toast">{toast}</div>}
       </div>
+    </div>
     </>
   );
 }

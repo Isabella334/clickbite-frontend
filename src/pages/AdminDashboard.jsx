@@ -1,53 +1,123 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { restaurants as restaurantsApi, users as usersApi, orders as ordersApi, analytics, helpers } from "../services/api";
+import { analytics } from "../services/api";
 
-// ─────────────────────────────────────────────
-// STATIC CONFIG (no viene del backend)
-// ─────────────────────────────────────────────
-const CATEGORIES   = ["Burgers", "Pizza", "Sushi", "Mexican", "Asian", "Healthy", "Chicken", "Italian", "Indian"];
-const MENU_CATS    = ["Entradas", "Platos principales", "Acompañamientos", "Bebidas", "Postres"];
-const EMOJI_OPTS   = ["🍔","🍕","🍣","🌮","🍜","🥗","🍗","🍝","🍛","🥤","🍟","🧅","🍫","🥧","🍋","🌶️","🥩","🍄","🫔","🍱"];
-const TABS         = ["Resumen", "Restaurantes", "Usuarios", "Pedidos"];
-
-const STATUS_CONFIG = {
-  pending:    { label: "Pendiente",  color: "#94a3b8", bg: "rgba(148,163,184,0.12)", icon: "🕐" },
-  confirmed:  { label: "Confirmado", color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  icon: "✅" },
-  preparing:  { label: "Preparando", color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  icon: "👨‍🍳" },
-  on_the_way: { label: "En camino",  color: "#a78bfa", bg: "rgba(167,139,250,0.12)", icon: "🛵" },
-  delivered:  { label: "Entregado",  color: "#52c49b", bg: "rgba(82,196,155,0.12)",  icon: "✓"  },
-  cancelled:  { label: "Cancelado",  color: "#e05c5c", bg: "rgba(224,92,92,0.12)",   icon: "✕"  },
+// ---------------------------------------------
+// MOCK DATA
+// ---------------------------------------------
+const mockStats = {
+  totalRevenue: 14820.50, totalOrders: 1043,
+  totalUsers: 512, totalRestaurants: 28,
+  ordersToday: 87, revenueToday: 1240.75,
+  newUsersWeek: 34, activeRestaurants: 21,
 };
 
-const EMPTY_REST      = { name: "", email: "", phone: "", category: "Burgers", image: "🍔", ownerName: "", ownerEmail: "", ownerPassword: "" };
-const EMPTY_MENU_ITEM = { name: "", description: "", price: "", category: "Platos principales", image: "🍔", popular: false };
-const EMPTY_USER      = { name: "", email: "", password: "", role: "customer" };
-const WIZARD_STEPS    = ["Info del restaurante", "Cuenta del dueño", "Menú inicial", "Revisar"];
+const mockWeekData = [
+  { day: "Mon", revenue: 1820, orders: 124 },
+  { day: "Tue", revenue: 1540, orders: 108 },
+  { day: "Wed", revenue: 2310, orders: 162 },
+  { day: "Thu", revenue: 1980, orders: 140 },
+  { day: "Fri", revenue: 2740, orders: 195 },
+  { day: "Sat", revenue: 3190, orders: 227 },
+  { day: "Sun", revenue: 1240, orders:  87 },
+];
+
+const initialRestaurants = [
+  { id: 1, name: "Burger Palace", owner: "John D.",  category: "Burgers", orders: 320, rating: 4.8, status: "active",   joined: "Dec 5, 2023",  image: "🍔", email: "bp@restaurant.com",   phone: "555-0101", menuItems: 12 },
+  { id: 2, name: "Sushi Zen",     owner: "Kenji T.", category: "Sushi",   orders: 210, rating: 4.9, status: "active",   joined: "Nov 20, 2023", image: "🍣", email: "zen@restaurant.com",  phone: "555-0102", menuItems: 18 },
+  { id: 3, name: "Pizza Mondo",   owner: "Marco R.", category: "Pizza",   orders: 89,  rating: 4.2, status: "inactive", joined: "Jan 8, 2024",  image: "🍕", email: "pizza@restaurant.com",phone: "555-0103", menuItems: 9  },
+  { id: 4, name: "Taco Fiesta",   owner: "Rosa M.",  category: "Mexican", orders: 178, rating: 4.5, status: "active",   joined: "Oct 14, 2023", image: "🌮", email: "tacos@restaurant.com",phone: "555-0104", menuItems: 14 },
+];
+
+// -- Pipeline 4: Historial resumido por usuario
+// GET /api/admin/analytics/user-order-summary
+// db.orders.aggregate([ {$group:{_id:"$user_id", totalOrders:{$sum:1}, totalSpent:{$sum:"$total"}}} ])
+const initialUsers = [
+  { id: 1, name: "Maria Garcia",     email: "maria@email.com",      role: "customer",   status: "active",    joined: "Jan 12, 2024", orders: 18, totalSpent: 284.50 },
+  { id: 2, name: "Carlos Rodriguez", email: "carlos@email.com",     role: "customer",   status: "active",    joined: "Feb 3, 2024",  orders: 7,  totalSpent: 98.75  },
+  { id: 3, name: "Ana Lopez",        email: "ana@email.com",        role: "customer",   status: "suspended", joined: "Mar 1, 2024",  orders: 2,  totalSpent: 31.98  },
+  { id: 4, name: "Burger Palace",    email: "bp@restaurant.com",    role: "restaurant", status: "active",    joined: "Dec 5, 2023",  orders: 320,totalSpent: null   },
+  { id: 5, name: "Sushi Zen",        email: "zen@restaurant.com",   role: "restaurant", status: "active",    joined: "Nov 20, 2023", orders: 210,totalSpent: null   },
+  { id: 6, name: "Luis Mendez",      email: "luis@email.com",       role: "customer",   status: "active",    joined: "Feb 18, 2024", orders: 5,  totalSpent: 67.45  },
+];
+
+const mockOrders = [
+  { id: "ORD-0042", customer: "Maria G.",   restaurant: "Burger Palace", total: 25.97, status: "delivered",  date: "Today, 3:12 PM" },
+  { id: "ORD-0041", customer: "Carlos R.",  restaurant: "Sushi Zen",     total: 38.48, status: "on_the_way", date: "Today, 3:06 PM" },
+  { id: "ORD-0040", customer: "Ana L.",     restaurant: "Pizza Mondo",   total: 16.98, status: "preparing",  date: "Today, 2:59 PM" },
+  { id: "ORD-0039", customer: "Luis M.",    restaurant: "Taco Fiesta",   total: 12.98, status: "delivered",  date: "Today, 2:42 PM" },
+  { id: "ORD-0038", customer: "Sofia P.",   restaurant: "Burger Palace", total: 30.96, status: "delivered",  date: "Today, 2:29 PM" },
+  { id: "ORD-0037", customer: "Diego F.",   restaurant: "Sushi Zen",     total: 44.97, status: "cancelled",  date: "Today, 2:15 PM" },
+];
+
+// -- Pipeline 1: Restaurantes mejor calificados
+// GET /api/admin/analytics/top-rated-restaurants
+// db.reviews.aggregate([ {$group:{_id:"$restaurant_id", avgRating:{$avg:"$rating"}, totalReviews:{$sum:1}}},
+//   {$lookup:{from:"restaurants",localField:"_id",foreignField:"_id",as:"restaurant"}},
+//   {$sort:{avgRating:-1}}, {$limit:5} ])
+const mockTopRated = [
+  { id: 2, name: "Sushi Zen",    image: "🍣", avgRating: 4.9, totalReviews: 184 },
+  { id: 1, name: "Burger Palace",image: "🍔", avgRating: 4.8, totalReviews: 320 },
+  { id: 6, name: "Noodle House", image: "🍜", avgRating: 4.7, totalReviews: 97  },
+  { id: 4, name: "Taco Fiesta",  image: "🌮", avgRating: 4.5, totalReviews: 142 },
+  { id: 5, name: "Green Bowl",   image: "🥗", avgRating: 4.4, totalReviews: 73  },
+];
+
+// -- Pipeline 3: Total de ventas por restaurante (solo ordenes delivered)
+// GET /api/admin/analytics/revenue-by-restaurant
+// db.orders.aggregate([ {$match:{status:"delivered"}},
+//   {$group:{_id:"$restaurant_id", totalRevenue:{$sum:"$total"}, totalOrders:{$sum:1}}},
+//   {$sort:{totalRevenue:-1}} ])
+const mockRevenueByRestaurant = [
+  { id: 1, name: "Burger Palace", image: "🍔", totalRevenue: 4820.50, totalOrders: 320 },
+  { id: 2, name: "Sushi Zen",     image: "🍣", totalRevenue: 3940.20, totalOrders: 210 },
+  { id: 4, name: "Taco Fiesta",   image: "🌮", totalRevenue: 2615.80, totalOrders: 178 },
+  { id: 6, name: "Noodle House",  image: "🍜", totalRevenue: 1988.40, totalOrders: 143 },
+  { id: 5, name: "Green Bowl",    image: "🥗", totalRevenue: 1240.10, totalOrders: 95  },
+  { id: 3, name: "Pizza Mondo",   image: "🍕", totalRevenue:  980.75, totalOrders: 89  },
+];
+
+const CATEGORIES   = ["Burgers", "Pizza", "Sushi", "Mexican", "Asian", "Healthy", "Chicken", "Italian", "Indian"];
+const MENU_CATS    = ["Starters", "Mains", "Sides", "Drinks", "Desserts"];
+const EMOJI_OPTS   = ["🍔","🍕","🍣","🌮","🍜","🥗","🍗","🍝","🍛","🥤","🍟","🧅","🍫","🥧","🍋","🌶️","🥩","🍄","🫔","🍱"];
+const TABS         = ["Overview", "Restaurants", "Users", "Orders"];
+
+const STATUS_CONFIG = {
+  pending:    { label: "Pending",    color: "#94a3b8", bg: "rgba(148,163,184,0.12)", icon: "🕐" },
+  confirmed:  { label: "Confirmed",  color: "#60a5fa", bg: "rgba(96,165,250,0.12)",  icon: "✅" },
+  preparing:  { label: "Preparing",  color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  icon: "👨‍🍳" },
+  on_the_way: { label: "On the way", color: "#a78bfa", bg: "rgba(167,139,250,0.12)", icon: "🛵" },
+  delivered:  { label: "Delivered",  color: "#52c49b", bg: "rgba(82,196,155,0.12)",  icon: "✓"  },
+  cancelled:  { label: "Cancelled",  color: "#e05c5c", bg: "rgba(224,92,92,0.12)",   icon: "✕"  },
+};
+
+const EMPTY_REST = { name: "", email: "", phone: "", category: "Burgers", image: "🍔", ownerName: "", ownerEmail: "", ownerPassword: "" };
+const EMPTY_MENU_ITEM = { name: "", description: "", price: "", category: "Mains", image: "🍔", popular: false };
+const EMPTY_USER = { name: "", email: "", password: "", role: "customer" };
+
+// -- Wizard steps for restaurant creation --
+const WIZARD_STEPS = ["Restaurant info", "Owner account", "Initial menu", "Review"];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
-  const [activeTab,      setActiveTab]      = useState("Resumen");
-
-  // ── Data from backend ──
-  const [restaurants,    setRestaurants]    = useState([]);
-  const [users,          setUsers]          = useState([]);
-  const [orders,         setOrders]         = useState([]);
-  const [topRated,       setTopRated]       = useState([]);
-  const [salesByRest,    setSalesByRest]    = useState([]);
-  const [loading,        setLoading]        = useState(true);
-  const [error,          setError]          = useState("");
-
+  const [activeTab,      setActiveTab]      = useState("Overview");
+  const [restaurants,    setRestaurants]    = useState(initialRestaurants);
+  const [users,          setUsers]          = useState(initialUsers);
   const [search,         setSearch]         = useState("");
-  const [restFilter,     setRestFilter]     = useState("Todos");
-  const [userFilter,     setUserFilter]     = useState("Todos");
-  const [orderFilter,    setOrderFilter]    = useState("Todos");
+  const [restFilter,     setRestFilter]     = useState("All");
+  const [userFilter,     setUserFilter]     = useState("All");
+  const [orderFilter,    setOrderFilter]    = useState("All");
   const [chartMetric,    setChartMetric]    = useState("revenue");
   const [topRatedLimit,  setTopRatedLimit]  = useState(5);
   const [revenueLimit,   setRevenueLimit]   = useState(6);
   const [toast,          setToast]          = useState("");
+  // Real data from analytics endpoints
+  const [topRated,       setTopRated]       = useState(mockTopRated);
+  const [revenueByRest,  setRevenueByRest]  = useState(mockRevenueByRestaurant);
+  const [userSummary,    setUserSummary]    = useState([]);
 
-  // ── Restaurant wizard ──
+  // -- Restaurant wizard --
   const [restModal,      setRestModal]      = useState(false);
   const [wizardStep,     setWizardStep]     = useState(0);
   const [restForm,       setRestForm]       = useState(EMPTY_REST);
@@ -56,97 +126,29 @@ export default function AdminDashboard() {
   const [restErrors,     setRestErrors]     = useState({});
   const [saving,         setSaving]         = useState(false);
 
-  // ── Delete restaurant ──
+  // -- Delete restaurant --
   const [deleteRestId,   setDeleteRestId]   = useState(null);
 
-  // ── User modal ──
+  // -- User modal --
   const [userModal,      setUserModal]      = useState(false);
   const [userForm,       setUserForm]       = useState(EMPTY_USER);
   const [userErrors,     setUserErrors]     = useState({});
   const [savingUser,     setSavingUser]     = useState(false);
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
-
-  // ── Fetch all data on mount ──
+  // Fetch all real analytics data on mount
   useEffect(() => {
-    const fetchAll = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const [restsRaw, usersRaw, ordersRaw, topRatedRaw, salesRaw] = await Promise.all([
-          restaurantsApi.getAll(),
-          usersApi.getAll(),
-          ordersApi.getAll(),
-          analytics.getTopRatedRestaurants(),
-          analytics.getSalesByRestaurant(),
-        ]);
-
-        // ── Map restaurants ──
-        setRestaurants((restsRaw ?? []).map(r => ({
-          id:        r.id,
-          name:      r.name,
-          email:     r.contact?.email ?? "—",
-          phone:     r.contact?.phone ?? "—",
-          category:  r.categories?.[0] ?? "—",
-          image:     "🍽️",
-          rating:    r.avg_rating ?? 0,
-          orders:    0, // no orders count in restaurant model
-          status:    r.is_active ? "activo" : "inactivo",
-          joined:    new Date(r.created_at).toLocaleDateString("es-GT"),
-          menuItems: 0,
-          owner:     "—",
-        })));
-
-        // ── Map users ──
-        setUsers((usersRaw ?? []).map(u => ({
-          id:         u.id,
-          name:       u.name,
-          email:      u.email,
-          role:       u.role,
-          status:     u.is_active ? "activo" : "suspendido",
-          joined:     new Date(u.created_at).toLocaleDateString("es-GT"),
-          orders:     0,
-          totalSpent: null,
-        })));
-
-        // ── Map orders ──
-        setOrders((ordersRaw ?? []).map(o => ({
-          id:         o.id,
-          customer:   o.user_id,
-          restaurant: o.restaurant_id,
-          total:      o.total ?? 0,
-          status:     o.status,
-          date:       new Date(o.created_at).toLocaleString("es-GT"),
-        })));
-
-        // ── Map top rated (Pipeline 1) ──
-        // Response: [{ restaurant_id, restaurant_name, avg_rating, total_reviews }]
-        setTopRated((topRatedRaw ?? []).map(r => ({
-          id:           r.restaurant_id ?? r._id,
-          name:         r.restaurant_name ?? r.name ?? "—",
-          image:        "🍽️",
-          avgRating:    r.avg_rating ?? 0,
-          totalReviews: r.total_reviews ?? 0,
-        })));
-
-        // ── Map sales by restaurant (Pipeline 3) ──
-        // Response: [{ restaurant_id, restaurant_name, total_revenue, total_orders }]
-        setSalesByRest((salesRaw ?? []).map(r => ({
-          id:           r.restaurant_id ?? r._id,
-          name:         r.restaurant_name ?? r.name ?? "—",
-          image:        "🍽️",
-          totalRevenue: r.total_revenue ?? 0,
-          totalOrders:  r.total_orders  ?? 0,
-        })));
-
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAll();
+    Promise.all([
+      analytics.getTopRatedRestaurants(),
+      analytics.getSalesByRestaurant(),
+      analytics.getOrderSummaryByUser(),
+    ]).then(([topR, salesR, userS]) => {
+      if (topR?.length)   setTopRated(topR);
+      if (salesR?.length) setRevenueByRest(salesR);
+      if (userS?.length)  setUserSummary(userS.slice(0, 10));
+    }).catch(() => {});
   }, []);
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
   // ════════════════════════════════
   // RESTAURANT WIZARD
@@ -161,15 +163,15 @@ export default function AdminDashboard() {
   const validateStep = (step) => {
     const e = {};
     if (step === 0) {
-      if (!restForm.name.trim())            e.name     = "Obligatorio";
-      if (!restForm.email.includes("@"))    e.email    = "Correo inválido";
-      if (!restForm.phone.trim())           e.phone    = "Obligatorio";
-      if (!restForm.category)              e.category = "Obligatorio";
+      if (!restForm.name.trim())     e.name     = "Required";
+      if (!restForm.email.includes("@")) e.email = "Invalid email";
+      if (!restForm.phone.trim())    e.phone    = "Required";
+      if (!restForm.category)        e.category = "Required";
     }
     if (step === 1) {
-      if (!restForm.ownerName.trim())       e.ownerName    = "Obligatorio";
-      if (!restForm.ownerEmail.includes("@")) e.ownerEmail = "Correo inválido";
-      if (restForm.ownerPassword.length < 6)  e.ownerPassword = "Mínimo 6 caracteres";
+      if (!restForm.ownerName.trim())  e.ownerName  = "Required";
+      if (!restForm.ownerEmail.includes("@")) e.ownerEmail = "Invalid email";
+      if (restForm.ownerPassword.length < 6) e.ownerPassword = "Min 6 characters";
     }
     return e;
   };
@@ -208,94 +210,48 @@ export default function AdminDashboard() {
     if (restErrors[field]) setRestErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
   };
 
-  // Final save — POST /restaurants + POST /users (owner)
-  const saveRestaurant = async () => {
+  // Final save
+  const saveRestaurant = () => {
     setSaving(true);
-    try {
-      // 1. Crear el usuario dueño primero para obtener su ID
-      const ownerPayload = helpers.toCreateOwnerPayload({
-        ownerName:     restForm.ownerName,
-        ownerEmail:    restForm.ownerEmail,
-        ownerPassword: restForm.ownerPassword,
-      });
-      const ownerCreated = await usersApi.create(ownerPayload);
-
-      // 2. Crear el restaurante con owner_id apuntando al usuario recién creado
-      const restPayload = helpers.toCreateRestaurantPayload({
-        name:        restForm.name,
-        description: "",
-        category:    restForm.category,
-        phone:       restForm.phone,
-        email:       restForm.email,
-        ownerId:     ownerCreated.id,  // ← vincula restaurant → user
-      });
-      const created = await restaurantsApi.create(restPayload);
-
-      setRestaurants(prev => [{
-        id:        created.id,
-        name:      created.name,
-        email:     restForm.email,
-        phone:     restForm.phone,
-        category:  restForm.category,
-        image:     restForm.image,
-        rating:    0,
-        orders:    0,
-        status:    "activo",
-        joined:    new Date(created.created_at).toLocaleDateString("es-GT"),
+    setTimeout(() => {
+      // POST /api/admin/restaurants  +  POST /api/admin/restaurants/:id/menu
+      const newRest = {
+        id: Date.now(), name: restForm.name, owner: restForm.ownerName,
+        category: restForm.category, orders: 0, rating: 0,
+        status: "active", joined: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        image: restForm.image, email: restForm.email, phone: restForm.phone,
         menuItems: menuItems.length,
-        owner:     restForm.ownerName,
-      }, ...prev]);
-
+      };
+      setRestaurants(prev => [newRest, ...prev]);
+      // Also add owner as user
       setUsers(prev => [{
-        id:         ownerCreated.id,
-        name:       ownerCreated.name,
-        email:      ownerCreated.email,
-        role:       "restaurant",
-        status:     "activo",
-        joined:     new Date(ownerCreated.created_at).toLocaleDateString("es-GT"),
-        orders:     0,
-        totalSpent: null,
+        id: Date.now() + 1, name: restForm.ownerName, email: restForm.ownerEmail,
+        role: "restaurant", status: "active",
+        joined: newRest.joined, orders: 0,
       }, ...prev]);
-
-      closeRestModal();
-      showToast("Restaurante \"" + restForm.name + "\" creado con " + menuItems.length + " productos");
-    } catch (err) {
-      showToast("Error: " + err.message);
-    } finally {
       setSaving(false);
-    }
+      closeRestModal();
+      showToast("Restaurant \"" + restForm.name + "\" created with " + menuItems.length + " menu items");
+    }, 1200);
   };
 
-  // Toggle restaurant active status — PUT /restaurants/:id
-  const toggleRestStatus = async (id) => {
-    const r = restaurants.find(x => x.id === id);
-    if (!r) return;
-    const nextActive = r.status !== "activo";
-    try {
-      await restaurantsApi.update(id, { is_active: nextActive });
-      setRestaurants(prev => prev.map(x =>
-        x.id === id ? { ...x, status: nextActive ? "activo" : "inactivo" } : x
-      ));
-      showToast(nextActive ? "Restaurante activado" : "Restaurante desactivado");
-    } catch (err) {
-      showToast("Error: " + err.message);
-    }
+  // Toggle restaurant
+  const toggleRestStatus = (id) => {
+    setRestaurants(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      const next = r.status === "active" ? "inactive" : "active";
+      showToast(next === "active" ? "Restaurant activated" : "Restaurant deactivated");
+      return { ...r, status: next };
+    }));
   };
 
   const confirmDeleteRest = (id) => setDeleteRestId(id);
 
-  // DELETE /restaurants/:id
-  const handleDeleteRest = async () => {
+  const handleDeleteRest = () => {
     const name = restaurants.find(r => r.id === deleteRestId)?.name;
-    try {
-      await restaurantsApi.delete(deleteRestId);
-      setRestaurants(prev => prev.filter(r => r.id !== deleteRestId));
-      showToast("\"" + name + "\" eliminado");
-    } catch (err) {
-      showToast("Error: " + err.message);
-    } finally {
-      setDeleteRestId(null);
-    }
+    setRestaurants(prev => prev.filter(r => r.id !== deleteRestId));
+    setDeleteRestId(null);
+    showToast("\"" + name + "\" has been removed");
   };
 
   // ════════════════════════════════
@@ -306,96 +262,61 @@ export default function AdminDashboard() {
 
   const validateUser = () => {
     const e = {};
-    if (!userForm.name.trim())           e.name     = "Obligatorio";
-    if (!userForm.email.includes("@"))   e.email    = "Correo inválido";
-    if (userForm.password.length < 6)    e.password = "Mínimo 6 caracteres";
+    if (!userForm.name.trim())              e.name     = "Required";
+    if (!userForm.email.includes("@"))      e.email    = "Invalid email";
+    if (userForm.password.length < 6)       e.password = "Min 6 characters";
     return e;
   };
 
-  // POST /users
-  const saveUser = async () => {
+  const saveUser = () => {
     const e = validateUser();
     if (Object.keys(e).length) { setUserErrors(e); return; }
     setSavingUser(true);
-    try {
-      const payload = helpers.toRegisterPayload(userForm);
-      const created = await usersApi.create(payload);
+    setTimeout(() => {
+      // POST /api/admin/users
       setUsers(prev => [{
-        id:         created.id,
-        name:       created.name,
-        email:      created.email,
-        role:       created.role,
-        status:     "activo",
-        joined:     new Date(created.created_at).toLocaleDateString("es-GT"),
-        orders:     0,
-        totalSpent: null,
+        id: Date.now(), name: userForm.name, email: userForm.email,
+        role: userForm.role, status: "active",
+        joined: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        orders: 0,
       }, ...prev]);
-      closeUserModal();
-      showToast("Usuario \"" + created.name + "\" creado exitosamente");
-    } catch (err) {
-      setUserErrors({ submit: err.message });
-    } finally {
       setSavingUser(false);
-    }
+      closeUserModal();
+      showToast("User \"" + userForm.name + "\" created successfully");
+    }, 800);
   };
 
-  // PUT /users/:id  (toggle is_active)
-  const toggleUserStatus = async (id) => {
-    const u = users.find(x => x.id === id);
-    if (!u) return;
-    const nextActive = u.status !== "activo";
-    try {
-      await usersApi.update(id, { is_active: nextActive });
-      setUsers(prev => prev.map(x =>
-        x.id === id ? { ...x, status: nextActive ? "activo" : "suspendido" } : x
-      ));
-      showToast(nextActive ? "Usuario reactivado" : "Usuario suspendido");
-    } catch (err) {
-      showToast("Error: " + err.message);
-    }
+  const toggleUserStatus = (id) => {
+    setUsers(prev => prev.map(u => {
+      if (u.id !== id) return u;
+      const next = u.status === "active" ? "suspended" : "active";
+      showToast(next === "active" ? "User reactivated" : "User suspended");
+      return { ...u, status: next };
+    }));
   };
 
-  // ── Filtered lists ──
-  // ── Computed stats from real data ──
-  const totalRevenue    = salesByRest.reduce((s, r) => s + r.totalRevenue, 0);
-  const totalOrders     = orders.length;
-  const totalUsers      = users.length;
-  const totalRests      = restaurants.length;
-  const activeRests     = restaurants.filter(r => r.status === "activo").length;
-
+  // -- Filtered lists --
   const filteredRests = restaurants.filter(r => {
-    const matchStatus = restFilter === "Todos" || r.status === restFilter.toLowerCase();
+    const matchStatus = restFilter === "All" || r.status === restFilter.toLowerCase();
     const matchSearch = search === "" || r.name.toLowerCase().includes(search.toLowerCase());
     return matchStatus && matchSearch;
   });
 
   const filteredUsers = users.filter(u => {
-    const matchRole   = userFilter === "Todos" || u.role === userFilter.toLowerCase() || (userFilter === "Suspendidos" && u.status === "suspendido");
+    const matchRole   = userFilter === "All" || u.role === userFilter.toLowerCase() || (userFilter === "Suspended" && u.status === "suspended");
     const matchSearch = search === "" || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
     return matchRole && matchSearch;
   });
 
-  const filteredOrders = orders.filter(o => {
-    const matchStatus = orderFilter === "Todos" || o.status === orderFilter;
-    const matchSearch = search === "" || o.id.toLowerCase().includes(search.toLowerCase()) || (o.customer ?? "").toLowerCase().includes(search.toLowerCase());
+  const filteredOrders = mockOrders.filter(o => {
+    const matchStatus = orderFilter === "All" || o.status === orderFilter.toLowerCase().replace(/ /g, "_");
+    const matchSearch = search === "" || o.id.toLowerCase().includes(search.toLowerCase()) || o.customer.toLowerCase().includes(search.toLowerCase());
     return matchStatus && matchSearch;
   });
 
-  if (loading) return (
-    <div style={{ minHeight: "100vh", background: "#0d1117", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.4)", fontFamily: "DM Sans, sans-serif", gap: 12 }}>
-      <div style={{ width: 20, height: 20, border: "2px solid rgba(82,196,155,0.3)", borderTopColor: "#52c49b", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
-      Cargando datos…
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
-
-  if (error) return (
-    <div style={{ minHeight: "100vh", background: "#0d1117", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: "#e05c5c", fontFamily: "DM Sans, sans-serif" }}>
-      <div style={{ fontSize: "2rem" }}>⚠️</div>
-      <div>Error al cargar datos: {error}</div>
-      <button onClick={() => window.location.reload()} style={{ marginTop: 8, padding: "10px 20px", background: "#52c49b", border: "none", borderRadius: 8, color: "#0d1f1c", fontWeight: 700, cursor: "pointer" }}>Reintentar</button>
-    </div>
-  );
+  const chartMax = chartMetric === "revenue"
+    ? Math.max(...mockWeekData.map(d => d.revenue))
+    : Math.max(...mockWeekData.map(d => d.orders));
 
   return (
     <>
@@ -405,7 +326,7 @@ export default function AdminDashboard() {
 
         .ad-page { min-height: 100vh; background: #0d1117; font-family: 'DM Sans', sans-serif; color: #fff; display: flex; }
 
-        /* ── SIDEBAR ── */
+        /* -- SIDEBAR -- */
         .ad-sidebar { width: 220px; min-width: 220px; background: #111820; border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; padding: 28px 0; position: sticky; top: 0; height: 100vh; }
         .ad-logo { font-family: 'Syne', sans-serif; font-size: 1.3rem; font-weight: 800; color: #52c49b; letter-spacing: -0.5px; padding: 0 24px; margin-bottom: 4px; }
         .ad-logo span { color: #fff; }
@@ -422,7 +343,7 @@ export default function AdminDashboard() {
         .ad-logout { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 12px; background: transparent; border: none; color: rgba(255,255,255,0.3); font-family: 'DM Sans', sans-serif; font-size: 0.82rem; cursor: pointer; transition: color 0.2s; border-radius: 8px; text-align: left; }
         .ad-logout:hover { color: #e05c5c; background: rgba(224,92,92,0.06); }
 
-        /* ── MAIN ── */
+        /* -- MAIN -- */
         .ad-main { flex: 1; overflow-y: auto; }
         .ad-topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 36px; border-bottom: 1px solid rgba(255,255,255,0.06); background: #111820; position: sticky; top: 0; z-index: 50; gap: 16px; flex-wrap: wrap; }
         .ad-tabs { display: flex; gap: 4px; }
@@ -438,10 +359,10 @@ export default function AdminDashboard() {
         .ad-add-btn { display: flex; align-items: center; gap: 7px; padding: 8px 16px; background: #52c49b; border: none; border-radius: 8px; color: #0d1f1c; font-family: 'Syne', sans-serif; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
         .ad-add-btn:hover { background: #63d4ab; transform: translateY(-1px); }
 
-        /* ── CONTENT ── */
+        /* -- CONTENT -- */
         .ad-content { padding: 28px 36px; }
 
-        /* ── STAT CARDS ── */
+        /* -- STAT CARDS -- */
         .ad-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
         .ad-stat { background: #111820; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 18px 20px; animation: fadeUp 0.3s ease both; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -451,7 +372,7 @@ export default function AdminDashboard() {
         .ad-stat-value.yellow { color: #fbbf24; }
         .ad-stat-sub { font-size: 0.74rem; color: rgba(255,255,255,0.22); font-weight: 300; }
 
-        /* ── GRID ── */
+        /* -- GRID -- */
         .ad-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; margin-bottom: 20px; }
         .ad-card { background: #111820; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; overflow: hidden; animation: fadeUp 0.35s ease both; }
         .ad-card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); }
@@ -459,7 +380,7 @@ export default function AdminDashboard() {
         .ad-card-link { background: none; border: none; color: #52c49b; font-size: 0.78rem; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity 0.2s; }
         .ad-card-link:hover { opacity: 0.7; }
 
-        /* ── CHART ── */
+        /* -- CHART -- */
         .ad-chart-wrap { padding: 18px 20px; }
         .ad-chart-toggles { display: flex; gap: 6px; margin-bottom: 16px; }
         .ad-chart-toggle { padding: 4px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.1); background: transparent; color: rgba(255,255,255,0.35); font-family: 'DM Sans', sans-serif; font-size: 0.76rem; cursor: pointer; transition: all 0.18s; }
@@ -481,13 +402,13 @@ export default function AdminDashboard() {
         .ad-qrow-total { font-family: 'Syne', sans-serif; font-weight: 700; color: #fff; min-width: 52px; text-align: right; font-size: 0.86rem; }
         .ad-badge { padding: 3px 8px; border-radius: 999px; font-size: 0.68rem; font-weight: 600; white-space: nowrap; }
 
-        /* ── FILTERS ── */
+        /* -- FILTERS -- */
         .ad-filters { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
         .ad-filter { padding: 6px 14px; border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; background: transparent; color: rgba(255,255,255,0.4); font-family: 'DM Sans', sans-serif; font-size: 0.8rem; cursor: pointer; transition: all 0.18s; }
         .ad-filter:hover { border-color: rgba(82,196,155,0.3); color: rgba(255,255,255,0.7); }
         .ad-filter.active { background: #52c49b; border-color: #52c49b; color: #0d1f1c; font-weight: 600; }
 
-        /* ── TABLE ── */
+        /* -- TABLE -- */
         .ad-table-wrap { background: #111820; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; overflow: hidden; animation: fadeUp 0.3s ease; }
         .ad-table { width: 100%; border-collapse: collapse; }
         .ad-table th { padding: 12px 16px; text-align: left; font-size: 0.68rem; font-weight: 600; color: rgba(255,255,255,0.22); text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); white-space: nowrap; }
@@ -599,7 +520,7 @@ export default function AdminDashboard() {
         .ad-wizard-next:hover:not(:disabled) { background: #63d4ab; }
         .ad-wizard-next:disabled { opacity: 0.6; cursor: not-allowed; }
 
-        /* ── USER MODAL ── */
+        /* -- USER MODAL -- */
         .ad-modal { background: #111820; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; width: 100%; max-width: 440px; animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1); }
         .ad-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.06); }
         .ad-modal-title { font-family: 'Syne', sans-serif; font-size: 1.05rem; font-weight: 700; color: #fff; }
@@ -613,7 +534,7 @@ export default function AdminDashboard() {
         .ad-modal-cancel { padding: 12px 18px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 9px; color: rgba(255,255,255,0.4); font-family: 'DM Sans', sans-serif; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; }
         .ad-modal-cancel:hover { border-color: rgba(255,255,255,0.25); color: #fff; }
 
-        /* ── DELETE CONFIRM ── */
+        /* -- DELETE CONFIRM -- */
         .ad-delete-modal { background: #111820; border: 1px solid rgba(224,92,92,0.25); border-radius: 18px; width: 100%; max-width: 360px; padding: 32px; text-align: center; animation: popIn 0.25s cubic-bezier(0.34,1.56,0.64,1); }
         .ad-delete-icon { font-size: 2rem; margin-bottom: 14px; }
         .ad-delete-modal h3 { font-family: 'Syne', sans-serif; font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 8px; }
@@ -628,11 +549,11 @@ export default function AdminDashboard() {
         .ad-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(13,31,28,0.3); border-top-color: #0d1f1c; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ── TOAST ── */
+        /* -- TOAST -- */
         .ad-toast { position: fixed; bottom: 24px; right: 24px; display: flex; align-items: center; gap: 10px; padding: 13px 18px; background: #1a2535; border: 1px solid rgba(82,196,155,0.3); border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); z-index: 500; font-size: 0.88rem; color: #fff; animation: toastIn 0.35s cubic-bezier(0.34,1.56,0.64,1); }
         @keyframes toastIn { from { opacity: 0; transform: translateY(10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
-        /* ── PIPELINE CARDS ── */
+        /* -- PIPELINE CARDS -- */
         .ad-pipeline-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
 
         .ad-rank-row { display: flex; align-items: center; gap: 10px; padding: 11px 20px; border-bottom: 1px solid rgba(255,255,255,0.04); }
@@ -659,7 +580,7 @@ export default function AdminDashboard() {
 
       <div className="ad-page">
 
-        {/* ── SIDEBAR ── */}
+        {/* -- SIDEBAR -- */}
         <aside className="ad-sidebar">
           <div className="ad-logo">Click<span>Bite</span></div>
           <div className="ad-logo-sub">Admin Panel</div>
@@ -682,7 +603,7 @@ export default function AdminDashboard() {
           </div>
         </aside>
 
-        {/* ── MAIN ── */}
+        {/* -- MAIN -- */}
         <div className="ad-main">
           <div className="ad-topbar">
             <div className="ad-tabs">
@@ -695,12 +616,12 @@ export default function AdminDashboard() {
             <div className="ad-topbar-right">
               <div className="ad-search-wrap">
                 <span className="ad-search-icon">🔍</span>
-                <input className="ad-search" type="text" placeholder={"Buscar en " + activeTab.toLowerCase() + "…"} value={search} onChange={e => setSearch(e.target.value)} />
+                <input className="ad-search" type="text" placeholder={"Search " + activeTab.toLowerCase() + "…"} value={search} onChange={e => setSearch(e.target.value)} />
               </div>
-              {activeTab === "Restaurantes" && (
+              {activeTab === "Restaurants" && (
                 <button className="ad-add-btn" onClick={openRestModal}>+ Add restaurant</button>
               )}
-              {activeTab === "Usuarios" && (
+              {activeTab === "Users" && (
                 <button className="ad-add-btn" onClick={openUserModal}>+ Add user</button>
               )}
             </div>
@@ -709,14 +630,14 @@ export default function AdminDashboard() {
           <div className="ad-content">
 
             {/* ══ OVERVIEW ══ */}
-            {activeTab === "Resumen" && (
+            {activeTab === "Overview" && (
               <>
                 <div className="ad-stats">
                   {[
-                    { label: "Ingresos totales",  icon: "💰", value: "$" + totalRevenue.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}), sub: "Ventas entregadas", cls: "green"  },
-                    { label: "Pedidos totales",    icon: "📦", value: totalOrders.toLocaleString(), sub: orders.filter(o=>o.status==="delivered").length + " entregados", cls: ""       },
-                    { label: "Usuarios registrados",icon: "👥", value: totalUsers, sub: users.filter(u=>u.role==="customer").length + " clientes", cls: ""    },
-                    { label: "Restaurantes activos",icon: "🍽️", value: activeRests + "/" + totalRests, sub: (totalRests - activeRests) + " inactivos", cls: "yellow" },
+                    { label: "Total revenue",     icon: "💰", value: "$" + mockStats.totalRevenue.toLocaleString(), sub: "$" + mockStats.revenueToday + " today", cls: "green"  },
+                    { label: "Total orders",       icon: "📦", value: mockStats.totalOrders.toLocaleString(),        sub: mockStats.ordersToday + " today",         cls: ""       },
+                    { label: "Registered users",   icon: "👥", value: mockStats.totalUsers,                          sub: "+" + mockStats.newUsersWeek + " this week", cls: ""    },
+                    { label: "Active restaurants", icon: "🍽️", value: mockStats.activeRestaurants + "/" + mockStats.totalRestaurants, sub: (mockStats.totalRestaurants - mockStats.activeRestaurants) + " inactive", cls: "yellow" },
                   ].map((s, i) => (
                     <div key={s.label} className="ad-stat" style={{ animationDelay: i * 0.06 + "s" }}>
                       <div className="ad-stat-label">{s.icon} {s.label}</div>
@@ -728,26 +649,35 @@ export default function AdminDashboard() {
                 <div className="ad-grid">
                   <div className="ad-card" style={{ animationDelay: "0.1s" }}>
                     <div className="ad-card-header">
-                      <div className="ad-card-title">📈 Platform activity — this week</div>
+                      <div className="ad-card-title">📈 Platform activity - this week</div>
                     </div>
                     <div className="ad-chart-wrap">
                       <div className="ad-chart-toggles">
                         <button className={"ad-chart-toggle" + (chartMetric === "revenue" ? " active" : "")} onClick={() => setChartMetric("revenue")}>Revenue</button>
                         <button className={"ad-chart-toggle" + (chartMetric === "orders"  ? " active" : "")} onClick={() => setChartMetric("orders")}>Orders</button>
                       </div>
-                      <div className="ad-chart" style={{ alignItems: "center", justifyContent: "center" }}>
-                        <div style={{ color: "rgba(255,255,255,0.2)", fontSize: "0.82rem", textAlign: "center" }}>
-                          📊 Gráfica semanal — pendiente de endpoint
-                        </div>
+                      <div className="ad-chart">
+                        {mockWeekData.map((d, i) => {
+                          const val    = chartMetric === "revenue" ? d.revenue : d.orders;
+                          const height = Math.round((val / chartMax) * 100);
+                          const isToday = i === mockWeekData.length - 1;
+                          return (
+                            <div key={d.day} className="ad-bar-wrap">
+                              <div className="ad-bar-val">{chartMetric === "revenue" ? "$" + val : val}</div>
+                              <div className={"ad-bar" + (isToday ? " today" : "")} style={{ height: height + "%" }} />
+                              <div className={"ad-bar-day" + (isToday ? " today" : "")}>{d.day}</div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
                   <div className="ad-card" style={{ animationDelay: "0.15s" }}>
                     <div className="ad-card-header">
                       <div className="ad-card-title">🧾 Latest orders</div>
-                      <button className="ad-card-link" onClick={() => setActiveTab("Pedidos")}>View all →</button>
+                      <button className="ad-card-link" onClick={() => setActiveTab("Orders")}>View all →</button>
                     </div>
-                    {orders.slice(0, 5).map(o => {
+                    {mockOrders.slice(0, 5).map(o => {
                       const st = STATUS_CONFIG[o.status];
                       return (
                         <div key={o.id} className="ad-qrow">
@@ -762,8 +692,8 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* ── Pipeline 1: Restaurantes mejor calificados ── */}
-                {/* ── Pipeline 3: Total de ventas por restaurante ── */}
+                {/* -- Pipeline 1: Restaurantes mejor calificados -- */}
+                {/* -- Pipeline 3: Total de ventas por restaurante -- */}
                 <div className="ad-pipeline-grid">
                   <div className="ad-card" style={{ animationDelay: "0.2s" }}>
                     <div className="ad-card-header">
@@ -771,24 +701,29 @@ export default function AdminDashboard() {
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.25)" }}>$limit</span>
                         <select className="ad-limit-select" value={topRatedLimit} onChange={e => setTopRatedLimit(Number(e.target.value))}>
-                          {[3, 5, 10].map(n => <option key={n} value={n}>Top {n}</option>)}
+                          {[3, 5, 10, topRated.length].map(n => <option key={n} value={n}>{n === topRated.length ? "All" : "Top " + n}</option>)}
                         </select>
                       </div>
                     </div>
-                    {topRated.slice(0, topRatedLimit).map((r, i) => (
-                      <div key={r.id} className="ad-rank-row">
-                        <span className={"ad-rank-num" + (i < 3 ? " top" : "")}>#{i + 1}</span>
-                        <span className="ad-rank-emoji">{r.image}</span>
-                        <div style={{ flex: 1 }}>
-                          <div className="ad-rank-name">{r.name}</div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-                            <span className="ad-stars">{"★".repeat(Math.round(r.avgRating))}{"☆".repeat(5 - Math.round(r.avgRating))}</span>
-                            <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.3)" }}>{r.avgRating.toFixed(1)}</span>
+                    {topRated.slice(0, topRatedLimit).map((r, i) => {
+                      const rating = r.avg_rating ?? r.avgRating ?? 0;
+                      const reviews = r.total_reviews ?? r.totalReviews ?? 0;
+                      const emoji = r.image ?? "🍽️";
+                      return (
+                        <div key={r.restaurant_id ?? r.id} className="ad-rank-row">
+                          <span className={"ad-rank-num" + (i < 3 ? " top" : "")}>#{i + 1}</span>
+                          <span className="ad-rank-emoji">{emoji}</span>
+                          <div style={{ flex: 1 }}>
+                            <div className="ad-rank-name">{r.name}</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                              <span className="ad-stars">{"★".repeat(Math.round(rating))}{"☆".repeat(5 - Math.round(rating))}</span>
+                              <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.3)" }}>{Number(rating).toFixed(1)}</span>
+                            </div>
                           </div>
+                          <span className="ad-rank-meta">{reviews} reviews</span>
                         </div>
-                        <span className="ad-rank-meta">{r.totalReviews} reviews</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   <div className="ad-card" style={{ animationDelay: "0.25s" }}>
@@ -797,26 +732,29 @@ export default function AdminDashboard() {
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.25)" }}>$limit</span>
                         <select className="ad-limit-select" value={revenueLimit} onChange={e => setRevenueLimit(Number(e.target.value))}>
-                          {[3, 5, salesByRest.length].map(n => <option key={n} value={n}>{n === salesByRest.length ? "Todos" : "Top " + n}</option>)}
+                          {[3, 5, revenueByRest.length].map(n => <option key={n} value={n}>{n === revenueByRest.length ? "All" : "Top " + n}</option>)}
                         </select>
                       </div>
                     </div>
                     <div style={{ padding: "12px 20px" }}>
-                      {salesByRest.slice(0, revenueLimit).map((r) => {
-                        const maxRev = salesByRest[0]?.totalRevenue ?? 1;
-                        const pct    = Math.round((r.totalRevenue / maxRev) * 100);
+                      {revenueByRest.slice(0, revenueLimit).map((r, idx) => {
+                        const maxRev = revenueByRest[0]?.total_sales || revenueByRest[0]?.totalRevenue || 1;
+                        const rev = r.total_sales ?? r.totalRevenue ?? 0;
+                        const pct = Math.round((rev / maxRev) * 100);
+                        const label = r.name ?? ("Restaurante " + (idx + 1));
+                        const emoji = r.image ?? "🍽️";
                         return (
-                          <div key={r.id} style={{ marginBottom: 13 }}>
+                          <div key={r.restaurant_id ?? r.id} style={{ marginBottom: 13 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-                              <span style={{ fontSize: "1rem" }}>{r.image}</span>
-                              <span style={{ flex: 1, fontSize: "0.83rem", fontWeight: 500, color: "#fff" }}>{r.name}</span>
-                              <span className="ad-rev-amount">${r.totalRevenue.toLocaleString()}</span>
+                              <span style={{ fontSize: "1rem" }}>{emoji}</span>
+                              <span style={{ flex: 1, fontSize: "0.83rem", fontWeight: 500, color: "#fff" }}>{label}</span>
+                              <span className="ad-rev-amount">Q{rev.toLocaleString()}</span>
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                               <div className="ad-rev-bar-track" style={{ flex: 1 }}>
                                 <div className="ad-rev-bar-fill" style={{ width: pct + "%" }} />
                               </div>
-                              <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.25)", minWidth: 58 }}>{r.totalOrders} orders</span>
+                              <span style={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.25)", minWidth: 58 }}>{r.totalOrders ?? ""}</span>
                             </div>
                           </div>
                         );
@@ -829,10 +767,10 @@ export default function AdminDashboard() {
             )}
 
             {/* ══ RESTAURANTS ══ */}
-            {activeTab === "Restaurantes" && (
+            {activeTab === "Restaurants" && (
               <>
                 <div className="ad-filters">
-                  {["Todos", "Activos", "Inactivos"].map(f => (
+                  {["All", "Active", "Inactive"].map(f => (
                     <button key={f} className={"ad-filter" + (restFilter === f ? " active" : "")} onClick={() => setRestFilter(f)}>{f}</button>
                   ))}
                 </div>
@@ -861,7 +799,7 @@ export default function AdminDashboard() {
                           <td style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.82rem" }}>{r.owner}</td>
                           <td style={{ textAlign: "center", color: "#52c49b", fontWeight: 600 }}>{r.menuItems}</td>
                           <td style={{ fontWeight: 600, color: "#fff" }}>{r.orders}</td>
-                          <td><span className="ad-rating">{r.rating > 0 ? "⭐ " + r.rating : "—"}</span></td>
+                          <td><span className="ad-rating">{r.rating > 0 ? "⭐ " + r.rating : "-"}</span></td>
                           <td>
                             <button className="ad-switch-wrap" onClick={() => toggleRestStatus(r.id)}>
                               <div className={"ad-switch " + (r.status === "active" ? "on" : "off")}>
@@ -871,8 +809,8 @@ export default function AdminDashboard() {
                           </td>
                           <td>
                             <div className="ad-tbl-actions">
-                              <button className={"ad-btn-sm " + (r.status === "activo" ? "ad-btn-toggle-on" : "ad-btn-toggle-off")} onClick={() => toggleRestStatus(r.id)}>
-                                {r.status === "activo" ? "Desactivar" : "Activar"}
+                              <button className={"ad-btn-sm " + (r.status === "active" ? "ad-btn-toggle-on" : "ad-btn-toggle-off")} onClick={() => toggleRestStatus(r.id)}>
+                                {r.status === "active" ? "Deactivate" : "Activate"}
                               </button>
                               <button className="ad-btn-sm ad-btn-del" onClick={() => confirmDeleteRest(r.id)}>🗑</button>
                             </div>
@@ -886,17 +824,39 @@ export default function AdminDashboard() {
             )}
 
             {/* ══ USERS ══ */}
-            {activeTab === "Usuarios" && (
+            {activeTab === "Users" && (
               <>
                 <div className="ad-filters">
-                  {["Todos", "customer", "restaurant", "Suspendidos"].map(f => (
-                    <button key={f} className={"ad-filter" + (userFilter === f ? " active" : "")} onClick={() => setUserFilter(f)}>{f === "customer" ? "Cliente" : f === "restaurant" ? "Restaurante" : f}</button>
+                  {["All", "Customer", "Restaurant", "Suspended"].map(f => (
+                    <button key={f} className={"ad-filter" + (userFilter === f ? " active" : "")} onClick={() => setUserFilter(f)}>{f}</button>
                   ))}
                 </div>
+                {userSummary.length > 0 && (
+                  <div className="ad-card" style={{marginBottom:20,padding:"20px 24px"}}>
+                    <div className="ad-card-header" style={{marginBottom:14}}>
+                      <div className="ad-card-title">💸 Top clientes por gasto total</div>
+                      <span style={{fontSize:"0.75rem",color:"rgba(255,255,255,0.25)"}}>Pipeline: orders.aggregate group by user_id</span>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+                      {userSummary.map((u, i) => (
+                        <div key={u.user_id} style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,padding:"12px 14px"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                            <div style={{width:22,height:22,borderRadius:"50%",background:"rgba(82,196,155,0.15)",color:"#52c49b",fontSize:"0.72rem",fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                              {i+1}
+                            </div>
+                            <span style={{fontSize:"0.72rem",color:"rgba(255,255,255,0.3)",fontFamily:"monospace"}}>{u.user_id.slice(-8)}</span>
+                          </div>
+                          <div style={{fontFamily:"'Syne',sans-serif",fontSize:"1.1rem",fontWeight:700,color:"#52c49b"}}>Q{u.total_spent.toLocaleString()}</div>
+                          <div style={{fontSize:"0.75rem",color:"rgba(255,255,255,0.3)",marginTop:2}}>{u.total_orders} ordenes</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="ad-table-wrap">
                   <table className="ad-table">
                     <thead>
-                      <tr><th>Usuario</th><th>Rol</th><th>Registrado</th><th>Pedidos</th><th>Total gastado</th><th>Estado</th><th>Acción</th></tr>
+                      <tr><th>User</th><th>Role</th><th>Joined</th><th>Orders</th><th>Total spent</th><th>Status</th><th>Action</th></tr>
                     </thead>
                     <tbody>
                       {filteredUsers.map(u => (
@@ -914,12 +874,12 @@ export default function AdminDashboard() {
                           <td style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.8rem" }}>{u.joined}</td>
                           <td style={{ fontWeight: 600, color: "#fff" }}>{u.orders}</td>
                           <td style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, color: u.totalSpent ? "#52c49b" : "rgba(255,255,255,0.2)", fontSize: "0.88rem" }}>
-                            {u.totalSpent != null ? "$" + u.totalSpent.toFixed(2) : "—"}
+                            {u.totalSpent != null ? "$" + u.totalSpent.toFixed(2) : "-"}
                           </td>
-                          <td><span className={"ad-status " + (u.status === "activo" ? "active" : u.status === "suspendido" ? "suspended" : "inactive")}>{u.status}</span></td>
+                          <td><span className={"ad-status " + u.status}>{u.status}</span></td>
                           <td>
-                            <button className={"ad-btn-sm " + (u.status === "activo" ? "ad-btn-toggle-on" : "ad-btn-toggle-off")} onClick={() => toggleUserStatus(u.id)}>
-                              {u.status === "activo" ? "Suspender" : "Reactivar"}
+                            <button className={"ad-btn-sm " + (u.status === "active" ? "ad-btn-toggle-on" : "ad-btn-toggle-off")} onClick={() => toggleUserStatus(u.id)}>
+                              {u.status === "active" ? "Suspend" : "Reactivate"}
                             </button>
                           </td>
                         </tr>
@@ -931,10 +891,10 @@ export default function AdminDashboard() {
             )}
 
             {/* ══ ORDERS ══ */}
-            {activeTab === "Pedidos" && (
+            {activeTab === "Orders" && (
               <>
                 <div className="ad-filters">
-                  {["Todos", "pending", "preparing", "on_the_way", "delivered", "cancelled"].map(f => (
+                  {["All", "Pending", "Preparing", "On the way", "Delivered", "Cancelled"].map(f => (
                     <button key={f} className={"ad-filter" + (orderFilter === f ? " active" : "")} onClick={() => setOrderFilter(f)}>{f}</button>
                   ))}
                 </div>
@@ -972,7 +932,7 @@ export default function AdminDashboard() {
             <div className="ad-wizard" onClick={e => e.stopPropagation()}>
               <div className="ad-wizard-header">
                 <div className="ad-wizard-title">
-                  Agregar restaurante
+                  Add new restaurant
                   <button className="ad-wizard-close" onClick={closeRestModal}>✕</button>
                 </div>
                 {/* Step indicator */}
@@ -993,10 +953,10 @@ export default function AdminDashboard() {
 
               <div className="ad-wizard-body">
 
-                {/* ── STEP 0: Restaurant info ── */}
+                {/* -- STEP 0: Restaurant info -- */}
                 {wizardStep === 0 && (
                   <>
-                    <div className="ad-section-label">Detalles del restaurante</div>
+                    <div className="ad-section-label">Restaurant details</div>
                     <div className="ad-field">
                       <label>Icon</label>
                       <div className="ad-emoji-grid">
@@ -1007,8 +967,8 @@ export default function AdminDashboard() {
                     </div>
                     <div className="ad-field-row">
                       <div className="ad-field">
-                        <label>Nombre del restaurante</label>
-                        <input type="text" placeholder="Ej. Burger Palace" className={restErrors.name ? "err" : ""} value={restForm.name} onChange={e => handleRestFormChange("name", e.target.value)} />
+                        <label>Restaurant name</label>
+                        <input type="text" placeholder="e.g. Burger Palace" className={restErrors.name ? "err" : ""} value={restForm.name} onChange={e => handleRestFormChange("name", e.target.value)} />
                         {restErrors.name && <div className="ad-field-error">{restErrors.name}</div>}
                       </div>
                       <div className="ad-field">
@@ -1033,23 +993,23 @@ export default function AdminDashboard() {
                   </>
                 )}
 
-                {/* ── STEP 1: Owner account ── */}
+                {/* -- STEP 1: Owner account -- */}
                 {wizardStep === 1 && (
                   <>
-                    <div className="ad-section-label">Credenciales del dueño</div>
+                    <div className="ad-section-label">Owner credentials</div>
                     <div className="ad-field">
                       <label>Full name</label>
-                      <input type="text" placeholder="Juan García" className={restErrors.ownerName ? "err" : ""} value={restForm.ownerName} onChange={e => handleRestFormChange("ownerName", e.target.value)} />
+                      <input type="text" placeholder="John Smith" className={restErrors.ownerName ? "err" : ""} value={restForm.ownerName} onChange={e => handleRestFormChange("ownerName", e.target.value)} />
                       {restErrors.ownerName && <div className="ad-field-error">{restErrors.ownerName}</div>}
                     </div>
                     <div className="ad-field">
                       <label>Email (login)</label>
-                      <input type="email" placeholder="dueno@email.com" className={restErrors.ownerEmail ? "err" : ""} value={restForm.ownerEmail} onChange={e => handleRestFormChange("ownerEmail", e.target.value)} />
+                      <input type="email" placeholder="owner@email.com" className={restErrors.ownerEmail ? "err" : ""} value={restForm.ownerEmail} onChange={e => handleRestFormChange("ownerEmail", e.target.value)} />
                       {restErrors.ownerEmail && <div className="ad-field-error">{restErrors.ownerEmail}</div>}
                     </div>
                     <div className="ad-field">
                       <label>Password</label>
-                      <input type="password" placeholder="Mínimo 6 caracteres" className={restErrors.ownerPassword ? "err" : ""} value={restForm.ownerPassword} onChange={e => handleRestFormChange("ownerPassword", e.target.value)} />
+                      <input type="password" placeholder="Min 6 characters" className={restErrors.ownerPassword ? "err" : ""} value={restForm.ownerPassword} onChange={e => handleRestFormChange("ownerPassword", e.target.value)} />
                       {restErrors.ownerPassword && <div className="ad-field-error">{restErrors.ownerPassword}</div>}
                     </div>
                     <div style={{ padding: "12px 14px", background: "rgba(96,165,250,0.07)", border: "1px solid rgba(96,165,250,0.15)", borderRadius: 10, fontSize: "0.8rem", color: "rgba(255,255,255,0.4)", lineHeight: 1.5, marginTop: 4 }}>
@@ -1058,14 +1018,14 @@ export default function AdminDashboard() {
                   </>
                 )}
 
-                {/* ── STEP 2: Initial menu ── */}
+                {/* -- STEP 2: Initial menu -- */}
                 {wizardStep === 2 && (
                   <>
-                    <div className="ad-section-label">Agregar productos — {restForm.name || "new restaurant"}</div>
+                    <div className="ad-section-label">Add menu items - {restForm.name || "new restaurant"}</div>
                     <div className="ad-field-row">
                       <div className="ad-field">
                         <label>Item name</label>
-                        <input type="text" placeholder="Ej. Hamburguesa Clásica" className={restErrors.name ? "err" : ""} value={menuForm.name} onChange={e => handleMenuFormChange("name", e.target.value)} />
+                        <input type="text" placeholder="e.g. Classic Burger" className={restErrors.name ? "err" : ""} value={menuForm.name} onChange={e => handleMenuFormChange("name", e.target.value)} />
                         {restErrors.name && <div className="ad-field-error">{restErrors.name}</div>}
                       </div>
                       <div className="ad-field">
@@ -1090,7 +1050,7 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     </div>
-                    <button className="ad-add-item-btn" onClick={addMenuItem}>+ Agregar al menú</button>
+                    <button className="ad-add-item-btn" onClick={addMenuItem}>+ Add to menu</button>
 
                     {menuItems.length > 0 && (
                       <div className="ad-menu-draft">
@@ -1114,7 +1074,7 @@ export default function AdminDashboard() {
                   </>
                 )}
 
-                {/* ── STEP 3: Review ── */}
+                {/* -- STEP 3: Review -- */}
                 {wizardStep === 3 && (
                   <>
                     <div className="ad-section-label">Review before saving</div>
@@ -1123,8 +1083,8 @@ export default function AdminDashboard() {
                       {[
                         ["Name",     restForm.image + " " + restForm.name],
                         ["Category", restForm.category],
-                        ["Correo",    restForm.email],
-                        ["Teléfono",  restForm.phone],
+                        ["Email",    restForm.email],
+                        ["Phone",    restForm.phone],
                       ].map(([l, v]) => (
                         <div key={l} className="ad-review-row">
                           <span className="ad-review-label">{l}</span>
@@ -1136,8 +1096,8 @@ export default function AdminDashboard() {
                       <div className="ad-review-block-title">Owner account</div>
                       {[
                         ["Name",  restForm.ownerName],
-                        ["Correo", restForm.ownerEmail],
-                        ["Contraseña", "••••••"],
+                        ["Email", restForm.ownerEmail],
+                        ["Password", "••••••"],
                       ].map(([l, v]) => (
                         <div key={l} className="ad-review-row">
                           <span className="ad-review-label">{l}</span>
@@ -1158,7 +1118,7 @@ export default function AdminDashboard() {
                         </div>
                       ))}
                       {menuItems.length > 3 && (
-                        <div style={{ fontSize: "0.76rem", color: "rgba(255,255,255,0.25)", marginTop: 4 }}>+ {menuItems.length - 3} productos más</div>
+                        <div style={{ fontSize: "0.76rem", color: "rgba(255,255,255,0.25)", marginTop: 4 }}>+ {menuItems.length - 3} more items</div>
                       )}
                     </div>
                   </>
@@ -1177,7 +1137,7 @@ export default function AdminDashboard() {
                 ) : (
                   <button className="ad-wizard-next" onClick={saveRestaurant} disabled={saving}>
                     {saving && <span className="ad-spinner" />}
-                    {saving ? "Creando…" : "Crear restaurante"}
+                    {saving ? "Creating…" : "Create restaurant"}
                   </button>
                 )}
               </div>
@@ -1190,13 +1150,13 @@ export default function AdminDashboard() {
           <div className="ad-overlay" onClick={closeUserModal}>
             <div className="ad-modal" onClick={e => e.stopPropagation()}>
               <div className="ad-modal-header">
-                <div className="ad-modal-title">Crear usuario</div>
+                <div className="ad-modal-title">Create new user</div>
                 <button className="ad-modal-close" onClick={closeUserModal}>✕</button>
               </div>
               <div className="ad-modal-body">
                 <div className="ad-field">
                   <label>Full name</label>
-                  <input type="text" placeholder="Ana García" className={userErrors.name ? "err" : ""} value={userForm.name} onChange={e => { setUserForm(p => ({ ...p, name: e.target.value })); if (userErrors.name) setUserErrors(p => { const n = { ...p }; delete n.name; return n; }); }} />
+                  <input type="text" placeholder="Jane Smith" className={userErrors.name ? "err" : ""} value={userForm.name} onChange={e => { setUserForm(p => ({ ...p, name: e.target.value })); if (userErrors.name) setUserErrors(p => { const n = { ...p }; delete n.name; return n; }); }} />
                   {userErrors.name && <div className="ad-field-error">{userErrors.name}</div>}
                 </div>
                 <div className="ad-field">
@@ -1206,7 +1166,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="ad-field">
                   <label>Password</label>
-                  <input type="password" placeholder="Mínimo 6 caracteres" className={userErrors.password ? "err" : ""} value={userForm.password} onChange={e => { setUserForm(p => ({ ...p, password: e.target.value })); if (userErrors.password) setUserErrors(p => { const n = { ...p }; delete n.password; return n; }); }} />
+                  <input type="password" placeholder="Min 6 characters" className={userErrors.password ? "err" : ""} value={userForm.password} onChange={e => { setUserForm(p => ({ ...p, password: e.target.value })); if (userErrors.password) setUserErrors(p => { const n = { ...p }; delete n.password; return n; }); }} />
                   {userErrors.password && <div className="ad-field-error">{userErrors.password}</div>}
                 </div>
                 <div className="ad-field">
@@ -1221,33 +1181,31 @@ export default function AdminDashboard() {
                 <button className="ad-modal-cancel" onClick={closeUserModal}>Cancel</button>
                 <button className="ad-modal-save" onClick={saveUser} disabled={savingUser}>
                   {savingUser && <span className="ad-spinner" />}
-                  {savingUser ? "Creando…" : "Crear usuario"}
+                  {savingUser ? "Creating…" : "Create user"}
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ══════════ DELETE RESTAURANT CONFIRM ══════════ */}
         {deleteRestId && (
           <div className="ad-overlay" onClick={() => setDeleteRestId(null)}>
             <div className="ad-delete-modal" onClick={e => e.stopPropagation()}>
               <div className="ad-delete-icon">🗑️</div>
-              <h3>¿Eliminar restaurante?</h3>
+              <h3>Remove restaurant?</h3>
               <p>
-                Esto eliminará permanentemente a <strong style={{ color: "#fff" }}>
+                This will permanently remove <strong style={{ color: "#fff" }}>
                   {restaurants.find(r => r.id === deleteRestId)?.name}
-                </strong> y todos sus datos. Esta acción no se puede deshacer.
+                </strong> and all associated data. This cannot be undone.
               </p>
               <div className="ad-delete-actions">
                 <button className="ad-delete-cancel" onClick={() => setDeleteRestId(null)}>Cancel</button>
-                <button className="ad-delete-confirm" onClick={handleDeleteRest}>Sí, eliminar</button>
+                <button className="ad-delete-confirm" onClick={handleDeleteRest}>Yes, remove</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* ══════════ TOAST ══════════ */}
         {toast && <div className="ad-toast">✅ {toast}</div>}
 
       </div>

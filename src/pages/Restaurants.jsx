@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { restaurants as restaurantsApi } from "../services/api";
+import { restaurants as restaurantsApi, analytics } from "../services/api";
 
-// Emoji + color por categoría (el backend no los tiene — se derivan del lado del cliente)
+// Emoji + color por categoria (el backend no los tiene - se derivan del lado del cliente)
 const CATEGORY_STYLE = {
   Burgers: { image: "🍔", color: "#f97316" },
   Pizza:   { image: "🍕", color: "#ef4444" },
@@ -29,8 +29,11 @@ export default function Restaurants() {
   const [allRestaurants,  setAllRestaurants]  = useState([]);
   const [loading,         setLoading]         = useState(true);
   const [error,           setError]           = useState(null);
+  const [topRestaurants,  setTopRestaurants]  = useState([]);
+  const [topItems,        setTopItems]        = useState([]);
+  const [analyticsLoaded, setAnalyticsLoaded] = useState(false);
 
-  // ── Fetch restaurants from backend ──────────────────────────────────────
+  // -- Fetch restaurants from backend --------------------------------------
   useEffect(() => {
     restaurantsApi.getAll()
       .then(data => setAllRestaurants(data ?? []))
@@ -38,7 +41,19 @@ export default function Restaurants() {
       .finally(()  => setLoading(false));
   }, []);
 
-  // ── Derive categories from actual restaurant data ────────────────────────
+  // -- Fetch analytics (top restaurants + top items) ------------------------
+  useEffect(() => {
+    Promise.all([
+      analytics.getTopRatedRestaurants(),
+      analytics.getTopSellingItems(),
+    ]).then(([topR, topI]) => {
+      setTopRestaurants(topR ?? []);
+      setTopItems((topI ?? []).slice(0, 6));
+      setAnalyticsLoaded(true);
+    }).catch(() => setAnalyticsLoaded(true)); // fail silently - not critical
+  }, []);
+
+  // -- Derive categories from actual restaurant data ------------------------
   const categories = [
     "All",
     ...new Set(
@@ -431,6 +446,59 @@ export default function Restaurants() {
           .rs-main { padding: 24px 20px; }
           .rs-hero h1 { font-size: 1.5rem; }
         }
+
+        /* ANALYTICS SECTION */
+        .rs-analytics { margin-bottom: 44px; }
+        .rs-analytics-title {
+          font-family: 'Syne', sans-serif;
+          font-size: 1.1rem; font-weight: 700; color: #fff;
+          margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
+        }
+        .rs-analytics-title span { color: rgba(255,255,255,0.3); font-size: 0.82rem; font-weight: 400; font-family: 'DM Sans', sans-serif; }
+        .rs-analytics-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media(max-width:720px){ .rs-analytics-row { grid-template-columns: 1fr; } }
+
+        .rs-panel {
+          background: #111820; border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 16px; padding: 20px; overflow: hidden;
+        }
+        .rs-panel-head {
+          font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em;
+          text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 14px;
+        }
+        /* Top Restaurants rows */
+        .rs-top-row {
+          display: flex; align-items: center; gap: 12px;
+          padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+          cursor: pointer; transition: background 0.15s; border-radius: 8px;
+        }
+        .rs-top-row:last-child { border-bottom: none; }
+        .rs-top-row:hover { background: rgba(82,196,155,0.05); padding-left: 6px; }
+        .rs-top-rank {
+          width: 24px; height: 24px; border-radius: 50%;
+          background: rgba(82,196,155,0.1); color: #52c49b;
+          font-size: 0.75rem; font-weight: 700;
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .rs-top-rank.gold   { background: rgba(251,191,36,0.15); color: #fbbf24; }
+        .rs-top-rank.silver { background: rgba(156,163,175,0.15); color: #9ca3af; }
+        .rs-top-rank.bronze { background: rgba(180,120,80,0.15);  color: #b47850; }
+        .rs-top-emoji { font-size: 1.4rem; flex-shrink: 0; }
+        .rs-top-info { flex: 1; min-width: 0; }
+        .rs-top-name { font-size: 0.88rem; font-weight: 500; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .rs-top-sub  { font-size: 0.75rem; color: rgba(255,255,255,0.3); margin-top: 2px; }
+        .rs-top-stars { font-size: 0.85rem; font-weight: 700; color: #fbbf24; flex-shrink: 0; }
+        /* Top Items */
+        .rs-items-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .rs-item-chip {
+          background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 10px; padding: 10px 12px;
+          display: flex; flex-direction: column; gap: 4px;
+        }
+        .rs-item-chip-name { font-size: 0.82rem; color: #fff; font-weight: 500; line-height: 1.3; }
+        .rs-item-chip-sold { font-size: 0.73rem; color: #52c49b; }
+        .rs-item-chip-bar { height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; margin-top: 4px; }
+        .rs-item-chip-fill { height: 100%; background: linear-gradient(90deg, #52c49b, #1a7a58); border-radius: 2px; transition: width 0.6s ease; }
       `}</style>
 
       <div className="rs-page">
@@ -442,7 +510,7 @@ export default function Restaurants() {
             <span className="rs-search-icon">🔍</span>
             <input
               type="text"
-              placeholder="Buscar restaurantes o categorías…"
+              placeholder="Search restaurants or cuisines…"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -450,7 +518,7 @@ export default function Restaurants() {
 
           <div className="rs-nav-right">
             <button className="rs-nav-history" onClick={() => navigate("/order-history")}>
-              📋 Mis pedidos
+              📋 My Orders
             </button>
             <div className="rs-avatar" title="Profile">👤</div>
           </div>
@@ -459,9 +527,65 @@ export default function Restaurants() {
         {/* MAIN */}
         <main className="rs-main">
           <div className="rs-hero">
-            <h1>¿Qué se te <em>antoja</em> hoy?</h1>
-            <p>Elige entre {allRestaurants.length} restaurantes cerca de ti</p>
+            <h1>What are you <em>craving</em> today?</h1>
+            <p>Choose from {allRestaurants.length} restaurants near you</p>
           </div>
+
+          {/* ANALYTICS: Top Restaurants + Top Items */}
+          {analyticsLoaded && (topRestaurants.length > 0 || topItems.length > 0) && (
+            <div className="rs-analytics">
+              <div className="rs-analytics-title">
+                Lo mejor de ClickBite <span>basado en calificaciones y ventas reales</span>
+              </div>
+              <div className="rs-analytics-row">
+
+                {/* Top Rated Restaurants */}
+                <div className="rs-panel">
+                  <div className="rs-panel-head">Restaurantes mejor calificados</div>
+                  {topRestaurants.map((r, _i) => {
+                    const rankClass = _i === 0 ? "gold" : _i === 1 ? "silver" : _i === 2 ? "bronze" : "";
+                    const style = getCategoryStyle([]);
+                    return (
+                      <div
+                        key={r.restaurant_id}
+                        className="rs-top-row"
+                        onClick={() => navigate("/menu", { state: { restaurantId: r.restaurant_id } })}
+                      >
+                        <div className={"rs-top-rank " + rankClass}>{i + 1}</div>
+                        <div className="rs-top-emoji">{style.image}</div>
+                        <div className="rs-top-info">
+                          <div className="rs-top-name">{r.name}</div>
+                          <div className="rs-top-sub">{r.total_reviews} resenas</div>
+                        </div>
+                        <div className="rs-top-stars">&#11088; {Number(r.avg_rating).toFixed(1)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Top Selling Items */}
+                <div className="rs-panel">
+                  <div className="rs-panel-head">Productos mas vendidos</div>
+                  <div className="rs-items-grid">
+                    {topItems.map((item) => {
+                      const maxSold = topItems[0]?.total_sold || 1;
+                      const pct = Math.round((item.total_sold / maxSold) * 100);
+                      return (
+                        <div key={item.menu_item_id} className="rs-item-chip">
+                          <div className="rs-item-chip-name">{item.name}</div>
+                          <div className="rs-item-chip-sold">{item.total_sold.toLocaleString()} vendidos</div>
+                          <div className="rs-item-chip-bar">
+                            <div className="rs-item-chip-fill" style={{ width: pct + "%" }}/>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
 
           <div className="rs-controls">
             <div className="rs-categories">
@@ -477,33 +601,35 @@ export default function Restaurants() {
             </div>
 
             <div className="rs-sort">
-              <span>Ordenar por</span>
+              <span>Sort by</span>
               <select value={sortBy} onChange={e => setSortBy(e.target.value)}>
-                <option value="rating">Mejor calificados</option>
+                <option value="rating">Top rated</option>
+                <option value="time">Fastest</option>
+                <option value="delivery">Delivery fee</option>
               </select>
             </div>
           </div>
 
           <div className="rs-count">
-            Mostrando <strong>{filtered.length}</strong> restaurante{filtered.length !== 1 ? "s" : ""}
-            {activeCategory !== "All" && <> en <strong>{activeCategory}</strong></>}
+            Showing <strong>{filtered.length}</strong> restaurant{filtered.length !== 1 ? "s" : ""}
+            {activeCategory !== "All" && <> in <strong>{activeCategory}</strong></>}
           </div>
 
           <div className="rs-grid">
             {loading ? (
               <div className="rs-empty">
                 <div className="rs-empty-icon">⏳</div>
-                <p>Cargando restaurantes…</p>
+                <p>Loading restaurants…</p>
               </div>
             ) : error ? (
               <div className="rs-empty">
                 <div className="rs-empty-icon">⚠️</div>
-                <p>No se pudieron cargar los restaurantes: {error}</p>
+                <p>Could not load restaurants: {error}</p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="rs-empty">
                 <div className="rs-empty-icon">🍽️</div>
-                <p>No se encontraron restaurantes. Intenta con otra búsqueda.</p>
+                <p>No restaurants found. Try a different search.</p>
               </div>
             ) : (
               filtered.map((r, i) => {
@@ -531,8 +657,8 @@ export default function Restaurants() {
                       </div>
 
                       <div className="rs-card-meta">
-                        <span className="rs-card-meta-item">💬 {r.total_reviews ?? 0} reseñas</span>
-                        <span className="rs-card-meta-item">📞 {r.contact?.phone ?? "—"}</span>
+                        <span className="rs-card-meta-item">💬 {r.total_reviews ?? 0} reviews</span>
+                        <span className="rs-card-meta-item">📞 {r.contact?.phone ?? "-"}</span>
                       </div>
 
                       <div className="rs-card-footer">
@@ -541,7 +667,7 @@ export default function Restaurants() {
                           className="rs-card-btn"
                           onClick={e => { e.stopPropagation(); navigate("/menu", { state: { restaurantId: r.id } }); }}
                         >
-                          Ver menú →
+                          View Menu →
                         </button>
                       </div>
                     </div>
