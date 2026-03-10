@@ -1,33 +1,65 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { restaurants as restaurantsApi } from "../services/api";
 
-const mockRestaurants = [
-  { id: 1, name: "Burger Palace", category: "Burgers", rating: 4.8, time: "20-30", delivery: 1.99, image: "🍔", color: "#f97316" },
-  { id: 2, name: "Pizza Mondo",   category: "Pizza",   rating: 4.6, time: "25-35", delivery: 0,    image: "🍕", color: "#ef4444" },
-  { id: 3, name: "Sushi Zen",     category: "Sushi",   rating: 4.9, time: "30-45", delivery: 2.49, image: "🍣", color: "#8b5cf6" },
-  { id: 4, name: "Taco Fiesta",   category: "Mexican", rating: 4.5, time: "15-25", delivery: 0,    image: "🌮", color: "#f59e0b" },
-  { id: 5, name: "Noodle House",  category: "Asian",   rating: 4.7, time: "20-30", delivery: 1.49, image: "🍜", color: "#06b6d4" },
-  { id: 6, name: "Green Bowl",    category: "Healthy", rating: 4.4, time: "15-20", delivery: 0,    image: "🥗", color: "#22c55e" },
-  { id: 7, name: "Wing Stop",     category: "Chicken", rating: 4.3, time: "25-35", delivery: 1.99, image: "🍗", color: "#ec4899" },
-  { id: 8, name: "The Pasta Co.", category: "Italian", rating: 4.6, time: "30-40", delivery: 0,    image: "🍝", color: "#a78bfa" },
-  { id: 9, name: "Curry House",   category: "Indian",  rating: 4.8, time: "35-50", delivery: 2.99, image: "🍛", color: "#fb923c" },
-];
+// Emoji + color por categoría (el backend no los tiene — se derivan del lado del cliente)
+const CATEGORY_STYLE = {
+  Burgers: { image: "🍔", color: "#f97316" },
+  Pizza:   { image: "🍕", color: "#ef4444" },
+  Sushi:   { image: "🍣", color: "#8b5cf6" },
+  Mexican: { image: "🌮", color: "#f59e0b" },
+  Asian:   { image: "🍜", color: "#06b6d4" },
+  Healthy: { image: "🥗", color: "#22c55e" },
+  Chicken: { image: "🍗", color: "#ec4899" },
+  Italian: { image: "🍝", color: "#a78bfa" },
+  Indian:  { image: "🍛", color: "#fb923c" },
+  Default: { image: "🍽️", color: "#52c49b" },
+};
 
-const categories = ["All", "Burgers", "Pizza", "Sushi", "Mexican", "Asian", "Healthy", "Chicken", "Italian", "Indian"];
+const getCategoryStyle = (categories) => {
+  if (!categories?.length) return CATEGORY_STYLE.Default;
+  return CATEGORY_STYLE[categories[0]] ?? CATEGORY_STYLE.Default;
+};
 
 export default function Restaurants() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
-  const [sortBy, setSortBy] = useState("rating");
+  const [search,          setSearch]          = useState("");
+  const [activeCategory,  setActiveCategory]  = useState("All");
+  const [sortBy,          setSortBy]          = useState("rating");
+  const [allRestaurants,  setAllRestaurants]  = useState([]);
+  const [loading,         setLoading]         = useState(true);
+  const [error,           setError]           = useState(null);
 
-  const filtered = mockRestaurants
-    .filter(r => activeCategory === "All" || r.category === activeCategory)
-    .filter(r => r.name.toLowerCase().includes(search.toLowerCase()) || r.category.toLowerCase().includes(search.toLowerCase()))
+  // ── Fetch restaurants from backend ──────────────────────────────────────
+  useEffect(() => {
+    restaurantsApi.getAll()
+      .then(data => setAllRestaurants(data ?? []))
+      .catch(err  => setError(err.message))
+      .finally(()  => setLoading(false));
+  }, []);
+
+  // ── Derive categories from actual restaurant data ────────────────────────
+  const categories = [
+    "All",
+    ...new Set(
+      allRestaurants.flatMap(r => r.categories ?? [])
+    ),
+  ];
+
+  // Reset filter if selected category no longer exists in data
+  useEffect(() => {
+    if (activeCategory !== "All" && !categories.includes(activeCategory)) {
+      setActiveCategory("All");
+    }
+  }, [categories]);
+
+  const filtered = allRestaurants
+    .filter(r => r.is_active)
+    .filter(r => activeCategory === "All" || r.categories?.includes(activeCategory))
+    .filter(r => r.name.toLowerCase().includes(search.toLowerCase()) ||
+                 r.categories?.some(c => c.toLowerCase().includes(search.toLowerCase())))
     .sort((a, b) => {
-      if (sortBy === "rating") return b.rating - a.rating;
-      if (sortBy === "time") return parseInt(a.time) - parseInt(b.time);
-      if (sortBy === "delivery") return a.delivery - b.delivery;
+      if (sortBy === "rating") return (b.avg_rating ?? 0) - (a.avg_rating ?? 0);
       return 0;
     });
 
@@ -428,7 +460,7 @@ export default function Restaurants() {
         <main className="rs-main">
           <div className="rs-hero">
             <h1>What are you <em>craving</em> today?</h1>
-            <p>Choose from {mockRestaurants.length} restaurants near you</p>
+            <p>Choose from {allRestaurants.length} restaurants near you</p>
           </div>
 
           <div className="rs-controls">
@@ -460,53 +492,64 @@ export default function Restaurants() {
           </div>
 
           <div className="rs-grid">
-            {filtered.length === 0 ? (
+            {loading ? (
+              <div className="rs-empty">
+                <div className="rs-empty-icon">⏳</div>
+                <p>Loading restaurants…</p>
+              </div>
+            ) : error ? (
+              <div className="rs-empty">
+                <div className="rs-empty-icon">⚠️</div>
+                <p>Could not load restaurants: {error}</p>
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="rs-empty">
                 <div className="rs-empty-icon">🍽️</div>
                 <p>No restaurants found. Try a different search.</p>
               </div>
             ) : (
-              filtered.map((r, i) => (
-                <div
-                  key={r.id}
-                  className="rs-card"
-                  style={{ animationDelay: i * 0.05 + "s" }}
-                  onClick={() => navigate("/menu")}
-                >
+              filtered.map((r, i) => {
+                const style    = getCategoryStyle(r.categories);
+                const category = r.categories?.[0] ?? "Restaurant";
+                return (
                   <div
-                    className="rs-card-image"
-                    style={{ background: "linear-gradient(135deg, " + r.color + "22, " + r.color + "44)" }}
+                    key={r.id}
+                    className="rs-card"
+                    style={{ animationDelay: i * 0.05 + "s" }}
+                    onClick={() => navigate("/menu", { state: { restaurantId: r.id } })}
                   >
-                    {r.image}
-                    <span className="rs-card-badge">{r.category}</span>
-                    {r.delivery === 0 && <span className="rs-card-free">Free delivery</span>}
+                    <div
+                      className="rs-card-image"
+                      style={{ background: "linear-gradient(135deg, " + style.color + "22, " + style.color + "44)" }}
+                    >
+                      {style.image}
+                      <span className="rs-card-badge">{category}</span>
+                    </div>
+
+                    <div className="rs-card-body">
+                      <div className="rs-card-header">
+                        <div className="rs-card-name">{r.name}</div>
+                        <div className="rs-card-rating">⭐ {(r.avg_rating ?? 0).toFixed(1)}</div>
+                      </div>
+
+                      <div className="rs-card-meta">
+                        <span className="rs-card-meta-item">💬 {r.total_reviews ?? 0} reviews</span>
+                        <span className="rs-card-meta-item">📞 {r.contact?.phone ?? "—"}</span>
+                      </div>
+
+                      <div className="rs-card-footer">
+                        <span className="rs-card-category">{category}</span>
+                        <button
+                          className="rs-card-btn"
+                          onClick={e => { e.stopPropagation(); navigate("/menu", { state: { restaurantId: r.id } }); }}
+                        >
+                          View Menu →
+                        </button>
+                      </div>
+                    </div>
                   </div>
-
-                  <div className="rs-card-body">
-                    <div className="rs-card-header">
-                      <div className="rs-card-name">{r.name}</div>
-                      <div className="rs-card-rating">⭐ {r.rating}</div>
-                    </div>
-
-                    <div className="rs-card-meta">
-                      <span className="rs-card-meta-item">🕐 {r.time} min</span>
-                      <span className="rs-card-meta-item">
-                        🛵 {r.delivery === 0 ? "Free" : "$" + r.delivery.toFixed(2)}
-                      </span>
-                    </div>
-
-                    <div className="rs-card-footer">
-                      <span className="rs-card-category">{r.category}</span>
-                      <button
-                        className="rs-card-btn"
-                        onClick={e => { e.stopPropagation(); navigate("/menu"); }}
-                      >
-                        View Menu →
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </main>

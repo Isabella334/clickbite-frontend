@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { helpers, users } from "../services/api";
 
 export default function Login() {
   const navigate = useNavigate();
   const [mode, setMode] = useState("login");
-  const role = "customer"; // Register is always customer — restaurants are created by admin
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -14,17 +14,10 @@ export default function Login() {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // Simula la consulta a la BD según el email
-  const getMockRoleFromEmail = (email) => {
-    if (email.includes("admin")) return "admin";
-    if (email.includes("restaurant")) return "restaurant";
-    return "customer";
-  };
-
   const roleRoutes = {
-    customer: "/restaurants",
+    customer:   "/restaurants",
     restaurant: "/restaurant-dashboard",
-    admin: "/admin",
+    admin:      "/admin-dashboard",
   };
 
   const validate = () => {
@@ -37,22 +30,27 @@ export default function Login() {
     return e;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
     setErrors({});
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
       if (mode === "login") {
-        // Simula consulta a BD — el rol viene del servidor
-        const detectedRole = getMockRoleFromEmail(form.email);
-        navigate(roleRoutes[detectedRole]);
+        const user = await users.login(form.email, form.password);
+        helpers.saveSession(user);
+        navigate(roleRoutes[user.role] ?? "/restaurants");
       } else {
-        // En registro, el rol elegido se guardaría en la BD
-        navigate(roleRoutes[role]);
+        const payload = helpers.toRegisterPayload(form);
+        const created = await users.create(payload);
+        helpers.saveSession(created);
+        navigate("/restaurants");
       }
-    }, 1200);
+    } catch (err) {
+      setErrors({ submit: err.message });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (field, value) => {
@@ -204,6 +202,14 @@ export default function Login() {
           background: #111820;
           position: relative;
           overflow-y: auto;
+        }
+
+        .cb-right::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0;
+          width: 1px; height: 100%;
+          background: linear-gradient(to bottom, transparent, rgba(82,196,155,0.3) 30%, rgba(82,196,155,0.3) 70%, transparent);
         }
 
         /* MODE TOGGLE */
@@ -375,14 +381,18 @@ export default function Login() {
         <div className="cb-left">
           <div className="cb-brand">
             <div className="cb-brand-logo">Click<span>Bite</span></div>
+            <div className="cb-brand-tagline">Food delivery, reimagined</div>
           </div>
 
           <div className="cb-hero-text">
             <h2>
-              Tu comida<br />
-              favorita, <em>entregada</em><br />
-              al instante.
+              Your favorite<br />
+              food, <em>delivered</em><br />
+              instantly.
             </h2>
+            <p>
+              Discover hundreds of restaurants near you and get fresh meals delivered right to your door.
+            </p>
           </div>
         </div>
 
@@ -393,27 +403,34 @@ export default function Login() {
               className={"cb-mode-btn" + (mode === "login" ? " active" : "")}
               onClick={() => { setMode("login"); setErrors({}); }}
             >
-              Iniciar sesión
+              Sign In
             </button>
             <button
               className={"cb-mode-btn" + (mode === "register" ? " active" : "")}
               onClick={() => { setMode("register"); setErrors({}); }}
             >
-              Crear cuenta
+              Create Account
             </button>
           </div>
 
           <div className="cb-form-area" key={mode}>
             <div className="cb-form-heading">
-              <h1>{mode === "login" ? "¡Has vuelto!" : "Únete a ClickBite"}</h1>
+              <h1>{mode === "login" ? "Welcome back" : "Join ClickBite"}</h1>
+              <p>
+                {mode === "login"
+                  ? "Enter your credentials to continue"
+                  : "Create your account to get started"}
+              </p>
             </div>
+
+            {/* Restaurants are created by admin — register is customer only */}
 
             {mode === "register" && (
               <div className="cb-field">
-                <label>Nombre completo</label>
+                <label>Full Name</label>
                 <input
                   type="text"
-                  placeholder="Luis Pérez"
+                  placeholder="Jane Smith"
                   className={errors.name ? "error" : ""}
                   value={form.name}
                   onChange={e => handleChange("name", e.target.value)}
@@ -423,10 +440,10 @@ export default function Login() {
             )}
 
             <div className="cb-field">
-              <label>Correo electrónico</label>
+              <label>Email</label>
               <input
                 type="email"
-                placeholder="nombre@ejemplo.com"
+                placeholder="you@example.com"
                 className={errors.email ? "error" : ""}
                 value={form.email}
                 onChange={e => handleChange("email", e.target.value)}
@@ -435,7 +452,7 @@ export default function Login() {
             </div>
 
             <div className="cb-field">
-              <label>Contraseña</label>
+              <label>Password</label>
               <input
                 type="password"
                 placeholder="••••••••"
@@ -448,7 +465,7 @@ export default function Login() {
 
             {mode === "register" && (
               <div className="cb-field">
-                <label>Confirmar contraseña</label>
+                <label>Confirm Password</label>
                 <input
                   type="password"
                   placeholder="••••••••"
@@ -464,8 +481,14 @@ export default function Login() {
 
             <button className="cb-submit" onClick={handleSubmit} disabled={loading}>
               {loading && <span className="cb-spinner" />}
-              {loading ? "Please wait…" : mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
+              {loading ? "Por favor espera…" : mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
             </button>
+
+            {errors.submit && (
+              <div className="cb-error-msg" style={{ marginTop: 12, textAlign: "center", fontSize: "0.85rem" }}>
+                ⚠️ {errors.submit}
+              </div>
+            )}
           </div>
         </div>
       </div>

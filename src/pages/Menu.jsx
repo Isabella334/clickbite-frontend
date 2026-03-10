@@ -1,54 +1,52 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { helpers, menuItems as menuItemsApi, restaurants as restaurantsApi } from "../services/api";
 
-// ─────────────────────────────────────────────
-// MOCK DATA — reemplazar con fetch al backend:
-// GET /api/restaurants/:id/menu
-// ─────────────────────────────────────────────
-const mockRestaurant = {
-  id: 1,
-  name: "Burger Palace",
-  category: "Burgers",
-  rating: 4.8,
-  reviewCount: 320,
-  deliveryTime: "20-30",
-  deliveryFee: 1.99,
-  minOrder: 8.00,
-  image: "🍔",
-  color: "#f97316",
-  description: "Juicy handcrafted burgers made with 100% fresh beef. Your next favorite spot.",
-  isOpen: true,
+const CATEGORY_STYLE = {
+  Burgers: { image: "🍔", color: "#f97316" },
+  Pizza:   { image: "🍕", color: "#ef4444" },
+  Sushi:   { image: "🍣", color: "#8b5cf6" },
+  Mexican: { image: "🌮", color: "#f59e0b" },
+  Asian:   { image: "🍜", color: "#06b6d4" },
+  Healthy: { image: "🥗", color: "#22c55e" },
+  Chicken: { image: "🍗", color: "#ec4899" },
+  Italian: { image: "🍝", color: "#a78bfa" },
+  Indian:  { image: "🍛", color: "#fb923c" },
+  Default: { image: "🍽️", color: "#52c49b" },
 };
 
-const mockCategories = ["All", "Burgers", "Sides", "Drinks", "Desserts"];
-
-const mockMenuItems = [
-  { id: 1, category: "Burgers", name: "Classic Smash",      description: "Double smash patty, cheddar, pickles, house sauce",      price: 10.99, popular: true,  image: "🍔" },
-  { id: 2, category: "Burgers", name: "BBQ Bacon Stack",    description: "Triple patty, crispy bacon, BBQ sauce, onion rings",      price: 14.99, popular: true,  image: "🥩" },
-  { id: 3, category: "Burgers", name: "Mushroom Swiss",     description: "Sautéed mushrooms, Swiss cheese, garlic aioli",           price: 12.49, popular: false, image: "🍄" },
-  { id: 4, category: "Burgers", name: "Spicy Jalapeño",     description: "Fresh jalapeños, pepper jack, chipotle mayo",             price: 11.99, popular: false, image: "🌶️" },
-  { id: 5, category: "Sides",   name: "Crispy Fries",       description: "Golden seasoned fries with dipping sauce",                price: 3.99,  popular: true,  image: "🍟" },
-  { id: 6, category: "Sides",   name: "Onion Rings",        description: "Beer-battered rings, served with ranch",                  price: 4.49,  popular: false, image: "🧅" },
-  { id: 7, category: "Sides",   name: "Coleslaw",           description: "Creamy homemade coleslaw, lightly sweetened",             price: 2.99,  popular: false, image: "🥗" },
-  { id: 8, category: "Drinks",  name: "Craft Lemonade",     description: "Fresh-squeezed lemonade, mint & ice",                     price: 3.49,  popular: false, image: "🍋" },
-  { id: 9, category: "Drinks",  name: "Chocolate Shake",    description: "Thick milkshake with real cocoa and whipped cream",       price: 5.99,  popular: true,  image: "🥤" },
-  { id: 10, category: "Drinks", name: "Sparkling Water",    description: "Chilled sparkling mineral water",                         price: 1.99,  popular: false, image: "💧" },
-  { id: 11, category: "Desserts", name: "Brownie Sundae",   description: "Warm fudge brownie, vanilla ice cream, caramel drizzle",  price: 6.49,  popular: true,  image: "🍫" },
-  { id: 12, category: "Desserts", name: "Apple Pie Slice",  description: "Classic homestyle apple pie, served warm",                price: 4.99,  popular: false, image: "🥧" },
-];
-// ─────────────────────────────────────────────
-
 export default function Menu() {
-  const navigate = useNavigate();
+  const navigate   = useNavigate();
+  const location   = useLocation();
+  const restaurantId = location.state?.restaurantId;
 
-  // En producción estos vendrían del fetch:
-  const restaurant = mockRestaurant;
-  const menuItems = mockMenuItems;
-  const categories = mockCategories;
-
+  const [restaurant,     setRestaurant]     = useState(null);
+  const [menuItems,      setMenuItems]      = useState([]);
+  const [categories,     setCategories]     = useState(["All"]);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState(null);
   const [activeCategory, setActiveCategory] = useState("All");
-  const [cart, setCart] = useState({}); // { itemId: quantity }
-  const [cartOpen, setCartOpen] = useState(false);
+  const [cart,           setCart]           = useState({}); // { itemId: quantity }
+  const [cartOpen,       setCartOpen]       = useState(false);
+
+  // ── Fetch restaurant + menu items ────────────────────────────────────────
+  useEffect(() => {
+    if (!restaurantId) { setError("No restaurant selected."); setLoading(false); return; }
+
+    Promise.all([
+      restaurantsApi.getById(restaurantId),
+      menuItemsApi.getByRestaurant(restaurantId),
+    ])
+      .then(([rest, items]) => {
+        setRestaurant(rest);
+        const mapped = (items ?? []).map(helpers.toMenuItem);
+        setMenuItems(mapped);
+        const cats = ["All", ...new Set(mapped.map(i => i.category).filter(Boolean))];
+        setCategories(cats);
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [restaurantId]);
 
   // ── Helpers de carrito ──
   const addToCart = (itemId) => {
@@ -65,11 +63,11 @@ export default function Menu() {
   };
 
   const cartItems = Object.entries(cart).map(([id, qty]) => ({
-    ...menuItems.find(i => i.id === parseInt(id)),
+    ...menuItems.find(i => i.id === id),
     qty,
   }));
 
-  const cartTotal = cartItems.reduce((sum, i) => sum + i.price * i.qty, 0);
+  const cartTotal = cartItems.reduce((sum, i) => sum + (i.price ?? 0) * i.qty, 0);
   const cartCount = cartItems.reduce((sum, i) => sum + i.qty, 0);
 
   const filteredItems = activeCategory === "All"
@@ -78,8 +76,14 @@ export default function Menu() {
 
   const handleConfirmOrder = () => {
     if (cartItems.length === 0) return;
-    // Aquí pasarías el carrito al siguiente paso
-    navigate("/confirm");
+    navigate("/confirm", {
+      state: {
+        restaurantId,
+        restaurantName: restaurant?.name,
+        cartItems,
+        cartTotal,
+      },
+    });
   };
 
   return (
@@ -624,6 +628,21 @@ export default function Menu() {
 
       <div className="mn-page">
 
+        {/* LOADING / ERROR */}
+        {loading && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", color: "rgba(255,255,255,0.4)", fontFamily: "'DM Sans', sans-serif" }}>
+            ⏳ Loading menu…
+          </div>
+        )}
+        {error && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", gap: 12, fontFamily: "'DM Sans', sans-serif" }}>
+            <div style={{ fontSize: "2rem" }}>⚠️</div>
+            <div style={{ color: "#e05c5c" }}>{error}</div>
+            <button onClick={() => navigate("/restaurants")} style={{ marginTop: 8, padding: "10px 20px", background: "#52c49b", border: "none", borderRadius: 8, color: "#0d1f1c", fontWeight: 700, cursor: "pointer" }}>← Back to restaurants</button>
+          </div>
+        )}
+        {!loading && !error && restaurant && (<>
+
         {/* NAVBAR */}
         <nav className="mn-nav">
           <button className="mn-nav-back" onClick={() => navigate("/restaurants")}>
@@ -642,25 +661,23 @@ export default function Menu() {
 
         {/* RESTAURANT HEADER */}
         <div className="mn-header">
-          <div
-            className="mn-header-emoji"
-            style={{ background: "linear-gradient(135deg, " + restaurant.color + "33, " + restaurant.color + "66)" }}
+          <div className="mn-header-emoji"
+            style={{ background: "linear-gradient(135deg, " + (CATEGORY_STYLE[restaurant.categories?.[0]] ?? CATEGORY_STYLE.Default).color + "33, " + (CATEGORY_STYLE[restaurant.categories?.[0]] ?? CATEGORY_STYLE.Default).color + "66)" }}
           >
-            {restaurant.image}
+            {(CATEGORY_STYLE[restaurant.categories?.[0]] ?? CATEGORY_STYLE.Default).image}
           </div>
           <div className="mn-header-info">
             <div className="mn-header-top">
               <h1 className="mn-header-name">{restaurant.name}</h1>
-              <span className={"mn-open-badge " + (restaurant.isOpen ? "open" : "closed")}>
-                {restaurant.isOpen ? "● Open" : "● Closed"}
+              <span className={"mn-open-badge " + (restaurant.is_active ? "open" : "closed")}>
+                {restaurant.is_active ? "● Open" : "● Closed"}
               </span>
             </div>
             <p className="mn-header-desc">{restaurant.description}</p>
             <div className="mn-header-meta">
-              <span className="mn-meta-item">⭐ <strong>{restaurant.rating}</strong> ({restaurant.reviewCount} reviews)</span>
-              <span className="mn-meta-item">🕐 <strong>{restaurant.deliveryTime} min</strong></span>
-              <span className="mn-meta-item">🛵 <strong>${restaurant.deliveryFee.toFixed(2)}</strong> delivery</span>
-              <span className="mn-meta-item">📦 Min. order <strong>${restaurant.minOrder.toFixed(2)}</strong></span>
+              <span className="mn-meta-item">⭐ <strong>{(restaurant.avg_rating ?? 0).toFixed(1)}</strong> ({restaurant.total_reviews ?? 0} reviews)</span>
+              <span className="mn-meta-item">📞 <strong>{restaurant.contact?.phone ?? "—"}</strong></span>
+              <span className="mn-meta-item">✉️ <strong>{restaurant.contact?.email ?? "—"}</strong></span>
             </div>
           </div>
         </div>
@@ -703,7 +720,7 @@ export default function Menu() {
                           onAdd={() => addToCart(item.id)}
                           onRemove={() => removeFromCart(item.id)}
                           delay={idx}
-                          color={restaurant.color}
+                          color={(CATEGORY_STYLE[restaurant.categories?.[0]] ?? CATEGORY_STYLE.Default).color}
                         />
                       ))}
                     </div>
@@ -722,7 +739,7 @@ export default function Menu() {
                       onAdd={() => addToCart(item.id)}
                       onRemove={() => removeFromCart(item.id)}
                       delay={idx}
-                      color={restaurant.color}
+                      color={(CATEGORY_STYLE[restaurant.categories?.[0]] ?? CATEGORY_STYLE.Default).color}
                     />
                   ))}
                 </div>
@@ -771,13 +788,9 @@ export default function Menu() {
                         <span>Subtotal</span>
                         <span>${cartTotal.toFixed(2)}</span>
                       </div>
-                      <div className="mn-drawer-row">
-                        <span>Delivery fee</span>
-                        <span>${restaurant.deliveryFee.toFixed(2)}</span>
-                      </div>
                       <div className="mn-drawer-row total">
                         <span>Total</span>
-                        <span>${(cartTotal + restaurant.deliveryFee).toFixed(2)}</span>
+                        <span>${cartTotal.toFixed(2)}</span>
                       </div>
                     </div>
                     <button className="mn-checkout-btn" onClick={handleConfirmOrder}>
@@ -789,7 +802,9 @@ export default function Menu() {
             </div>
           </>
         )}
-      </div>
+        </>
+        )} {/* end !loading && !error && restaurant */}
+      </div> {/* end mn-page */}
     </>
   );
 }
