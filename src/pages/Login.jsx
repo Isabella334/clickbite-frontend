@@ -24,7 +24,7 @@ export default function Login() {
   const roleRoutes = {
     customer: "/restaurants",
     restaurant: "/restaurant-dashboard",
-    admin: "/admin-dashboard",
+    admin: "/admin",
   };
 
   const validate = () => {

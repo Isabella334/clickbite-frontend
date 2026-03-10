@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom"
 
+import Admin from "../pages/AdminDashboard"
 import Login from "../pages/Login"
 import Menu from "../pages/Menu"
 import OrderConfirm from "../pages/OrderConfirm"
@@ -31,6 +32,8 @@ export default function AppRouter() {
         <Route path="/restaurant-dashboard" element={<RestaurantDashboard />} />
 
         <Route path="/restaurant-orders" element={<RestaurantOrders />} />
+
+        <Route path="/admin" element={<Admin />} />
 
       </Routes>
 
