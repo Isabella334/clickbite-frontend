@@ -35,6 +35,8 @@ export default function Restaurants() {
   const [favorites,       setFavorites]       = useState(new Set()); // Set of restaurant IDs
   const [favLoading,      setFavLoading]       = useState(new Set()); // IDs currently toggling
   const session = helpers.getSession();
+  const [nearbyRestaurants, setNearbyRestaurants] = useState([]);
+  const [nearbyStatus,      setNearbyStatus]      = useState("idle"); // idle | requesting | loading | ok | denied | error
 
   // -- Fetch restaurants from backend --------------------------------------
   useEffect(() => {
@@ -87,6 +89,21 @@ export default function Restaurants() {
       setAnalyticsLoaded(true);
     }).catch(() => setAnalyticsLoaded(true)); // fail silently - not critical
   }, []);
+
+  // -- Nearby restaurants (geolocation) ------------------------------------
+  const requestNearby = () => {
+    if (!navigator.geolocation) { setNearbyStatus("error"); return; }
+    setNearbyStatus("requesting");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setNearbyStatus("loading");
+        restaurantsApi.getNearby(pos.coords.longitude, pos.coords.latitude, 5000)
+          .then(data => { setNearbyRestaurants(data ?? []); setNearbyStatus("ok"); })
+          .catch(() => setNearbyStatus("error"));
+      },
+      () => setNearbyStatus("denied")
+    );
+  };
 
   // -- Derive categories from actual restaurant data ------------------------
   const categories = [
@@ -177,6 +194,25 @@ export default function Restaurants() {
         .rs-card-btn:hover{background:#52c49b;color:#0a0e14}
 
         .rs-empty{grid-column:1/-1;padding:80px 20px;text-align:center;color:#3d4255;font-size:0.9rem}
+
+        /* Nearby */
+        .rs-nearby{margin-bottom:32px}
+        .rs-nearby-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+        .rs-nearby-title{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:#3d4255}
+        .rs-nearby-btn{padding:5px 12px;background:transparent;border:1px solid #1e2230;border-radius:4px;color:#4a5068;font-family:'DM Sans',sans-serif;font-size:0.75rem;cursor:pointer}
+        .rs-nearby-btn:hover{border-color:#52c49b44;color:#52c49b}
+        .rs-nearby-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+        .rs-nearby-row::-webkit-scrollbar{height:3px}
+        .rs-nearby-row::-webkit-scrollbar-track{background:#1a1e2e}
+        .rs-nearby-row::-webkit-scrollbar-thumb{background:#2a3040;border-radius:2px}
+        .rs-nearby-card{flex-shrink:0;width:200px;background:#131720;border:1px solid #1e2230;border-radius:7px;cursor:pointer;overflow:hidden}
+        .rs-nearby-card:hover{border-color:#2a3040}
+        .rs-nearby-thumb{height:64px;background:#1a1e2e;display:flex;align-items:center;justify-content:center;font-size:1.8rem}
+        .rs-nearby-info{padding:10px}
+        .rs-nearby-name{font-size:0.85rem;font-weight:500;color:#e8eaf0;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .rs-nearby-meta{display:flex;gap:8px;font-size:0.72rem;color:#3d4255}
+        .rs-nearby-dist{font-family:'DM Mono',monospace;color:#52c49b}
+        .rs-nearby-status{font-size:0.82rem;color:#3d4255;padding:12px 0}
       `}</style>
 
       {/* NAV */}
@@ -192,6 +228,57 @@ export default function Restaurants() {
       <main className="rs-main">
         <div className="rs-page-title">What are you craving?</div>
         <div className="rs-page-sub">{allRestaurants.length} restaurants available</div>
+
+        {/* Nearby */}
+        <div className="rs-nearby">
+          <div className="rs-nearby-header">
+            <span className="rs-nearby-title">Near you</span>
+            {nearbyStatus === "idle" && (
+              <button className="rs-nearby-btn" onClick={requestNearby}>Use my location</button>
+            )}
+            {nearbyStatus === "ok" && (
+              <button className="rs-nearby-btn" onClick={requestNearby}>Refresh</button>
+            )}
+          </div>
+          {nearbyStatus === "idle" && (
+            <div className="rs-nearby-status">Enable location to see restaurants near you.</div>
+          )}
+          {(nearbyStatus === "requesting" || nearbyStatus === "loading") && (
+            <div className="rs-nearby-status">Locating...</div>
+          )}
+          {nearbyStatus === "denied" && (
+            <div className="rs-nearby-status">Location permission denied.</div>
+          )}
+          {nearbyStatus === "error" && (
+            <div className="rs-nearby-status">Could not load nearby restaurants.</div>
+          )}
+          {nearbyStatus === "ok" && nearbyRestaurants.length === 0 && (
+            <div className="rs-nearby-status">No restaurants within 5 km.</div>
+          )}
+          {nearbyStatus === "ok" && nearbyRestaurants.length > 0 && (
+            <div className="rs-nearby-row">
+              {nearbyRestaurants.map(r => {
+                const style = getCategoryStyle(r.categories);
+                const dist  = r.distance_meters >= 1000
+                  ? (r.distance_meters / 1000).toFixed(1) + " km"
+                  : Math.round(r.distance_meters) + " m";
+                return (
+                  <div key={r.id ?? r._id} className="rs-nearby-card"
+                    onClick={() => navigate("/menu", { state: { restaurantId: r.id ?? r._id } })}>
+                    <div className="rs-nearby-thumb">{style.image}</div>
+                    <div className="rs-nearby-info">
+                      <div className="rs-nearby-name">{r.name}</div>
+                      <div className="rs-nearby-meta">
+                        <span className="rs-nearby-dist">{dist}</span>
+                        <span>{(r.avg_rating ?? 0).toFixed(1)} ★</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Analytics */}
         {analyticsLoaded && (topRestaurants.length > 0 || topItems.length > 0) && (

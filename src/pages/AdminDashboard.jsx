@@ -5,7 +5,7 @@ import { analytics } from "../services/api";
 // ---------------------------------------------
 // MOCK DATA
 // ---------------------------------------------
-const mockStats = {
+  const mockStats = {
   totalRevenue: 14820.50, totalOrders: 1043,
   totalUsers: 512, totalRestaurants: 28,
   ordersToday: 87, revenueToday: 1240.75,
