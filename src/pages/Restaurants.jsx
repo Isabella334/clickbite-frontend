@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { restaurants as restaurantsApi, analytics, users as usersApi, helpers } from "../services/api";
+import { analytics, helpers, restaurants as restaurantsApi, users as usersApi } from "../services/api";
 
 // Emoji + color por categoria (el backend no los tiene - se derivan del lado del cliente)
 const CATEGORY_STYLE = {
@@ -218,42 +218,42 @@ export default function Restaurants() {
       {/* NAV */}
       <nav className="rs-nav">
         <div className="rs-logo">Click<span>Bite</span></div>
-        <input className="rs-search" type="text" placeholder="Search restaurants..." value={search} onChange={e=>setSearch(e.target.value)}/>
-        <button className="rs-nav-btn" onClick={()=>navigate("/order-history")}>My Orders</button>
+        <input className="rs-search" type="text" placeholder="Buscar restaurantes..." value={search} onChange={e=>setSearch(e.target.value)}/>
+        <button className="rs-nav-btn" onClick={()=>navigate("/order-history")}>Mis pedidos</button>
         <div style={{width:30,height:30,borderRadius:"50%",background:"#1a1e2e",border:"1px solid #1e2230",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.85rem",cursor:"pointer"}}>
           {session?.name?.charAt(0)?.toUpperCase() ?? "?"}
         </div>
       </nav>
 
       <main className="rs-main">
-        <div className="rs-page-title">What are you craving?</div>
-        <div className="rs-page-sub">{allRestaurants.length} restaurants available</div>
+        <div className="rs-page-title">¿Qué se te antoja?</div>
+        <div className="rs-page-sub">{allRestaurants.length} restaurantes disponibles</div>
 
         {/* Nearby */}
         <div className="rs-nearby">
           <div className="rs-nearby-header">
-            <span className="rs-nearby-title">Near you</span>
+            <span className="rs-nearby-title">Cerca de ti</span>
             {nearbyStatus === "idle" && (
-              <button className="rs-nearby-btn" onClick={requestNearby}>Use my location</button>
+              <button className="rs-nearby-btn" onClick={requestNearby}>Usar mi ubicación</button>
             )}
             {nearbyStatus === "ok" && (
-              <button className="rs-nearby-btn" onClick={requestNearby}>Refresh</button>
+              <button className="rs-nearby-btn" onClick={requestNearby}>Actualizar</button>
             )}
           </div>
           {nearbyStatus === "idle" && (
-            <div className="rs-nearby-status">Enable location to see restaurants near you.</div>
+            <div className="rs-nearby-status">Activa la ubicación para ver restaurantes cercanos.</div>
           )}
           {(nearbyStatus === "requesting" || nearbyStatus === "loading") && (
-            <div className="rs-nearby-status">Locating...</div>
+            <div className="rs-nearby-status">Localizando...</div>
           )}
           {nearbyStatus === "denied" && (
-            <div className="rs-nearby-status">Location permission denied.</div>
+            <div className="rs-nearby-status">Permiso de ubicación denegado.</div>
           )}
           {nearbyStatus === "error" && (
-            <div className="rs-nearby-status">Could not load nearby restaurants.</div>
+            <div className="rs-nearby-status">No se pudieron cargar los restaurantes cercanos.</div>
           )}
           {nearbyStatus === "ok" && nearbyRestaurants.length === 0 && (
-            <div className="rs-nearby-status">No restaurants within 5 km.</div>
+            <div className="rs-nearby-status">No hay restaurantes en un radio de 5 km.</div>
           )}
           {nearbyStatus === "ok" && nearbyRestaurants.length > 0 && (
             <div className="rs-nearby-row">
@@ -284,7 +284,7 @@ export default function Restaurants() {
         {analyticsLoaded && (topRestaurants.length > 0 || topItems.length > 0) && (
           <div className="rs-analytics">
             <div className="rs-panel">
-              <div className="rs-panel-title">Top rated</div>
+              <div className="rs-panel-title">Mejor valorados</div>
               {topRestaurants.map((r, i) => (
                 <div key={r.restaurant_id} className="rs-top-row" onClick={()=>navigate("/menu",{state:{restaurantId:r.restaurant_id}})}>
                   <span className="rs-top-rank">#{i+1}</span>
@@ -294,7 +294,7 @@ export default function Restaurants() {
               ))}
             </div>
             <div className="rs-panel">
-              <div className="rs-panel-title">Most ordered</div>
+              <div className="rs-panel-title">Más pedidos</div>
               <div className="rs-items-list">
                 {topItems.map(item => {
                   const maxSold = topItems[0]?.total_sold || 1;
@@ -317,20 +317,20 @@ export default function Restaurants() {
           {categories.map(cat => (
             <button key={cat} className={"rs-pill"+(activeCategory===cat?" active":"")} onClick={()=>setActiveCategory(cat)}>{cat}</button>
           ))}
-          <span className="rs-count">{filtered.length} result{filtered.length!==1?"s":""}</span>
+          <span className="rs-count">{filtered.length} resultado{filtered.length!==1?"s":""}</span>
         </div>
 
         {/* Grid */}
         <div className="rs-grid">
           {loading ? (
-            <div className="rs-empty">Loading...</div>
+            <div className="rs-empty">Cargando...</div>
           ) : error ? (
             <div className="rs-empty">Error: {error}</div>
           ) : filtered.length === 0 ? (
-            <div className="rs-empty">No restaurants found.</div>
+            <div className="rs-empty">No se encontraron restaurantes.</div>
           ) : filtered.map(r => {
             const style = getCategoryStyle(r.categories);
-            const cat   = r.categories?.[0] ?? "Restaurant";
+            const cat   = r.categories?.[0] ?? "Restaurante";
             const isFav = favorites.has(r.id);
             return (
               <div key={r.id} className="rs-card" onClick={()=>navigate("/menu",{state:{restaurantId:r.id}})}>
@@ -347,10 +347,10 @@ export default function Restaurants() {
                   <div className="rs-card-name">{r.name}</div>
                   <div className="rs-card-meta">
                     <span className={"rs-meta-item rs-meta-rating"}>{(r.avg_rating??0).toFixed(1)} ★</span>
-                    <span className="rs-meta-item">{r.total_reviews??0} reviews</span>
+                    <span className="rs-meta-item">{r.total_reviews??0} reseñas</span>
                   </div>
                   <button className="rs-card-btn" onClick={e=>{e.stopPropagation();navigate("/menu",{state:{restaurantId:r.id}})}}>
-                    View menu
+                    Ver menú
                   </button>
                 </div>
               </div>
